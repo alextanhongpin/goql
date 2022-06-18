@@ -13,9 +13,10 @@ const (
 	OpGt
 	OpGte
 	OpIn
+	OpNin
 	OpBetween
 	OpIs // Literal value, e.g. now(), null
-	OpIsNot
+	OpNot
 
 	// Range
 	OpOverlap
@@ -34,6 +35,8 @@ const (
 	OpYesterday
 
 	// Array
+	OpAny
+	OpAll
 	OpContains
 	OpSubset
 	OpSuperSet
@@ -51,23 +54,6 @@ func (o Ops) Copy() Ops {
 	}
 
 	return oo
-}
-
-func (o Ops) Is(v any) bool {
-	switch t := v.(type) {
-	case string:
-		for k := range o {
-			if strings.EqualFold(k.String(), t) {
-				return true
-			}
-		}
-
-		return false
-	case int:
-		return o[Op(t)]
-	default:
-		return false
-	}
 }
 
 func (o Ops) Get(v any) (Op, bool) {

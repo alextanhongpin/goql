@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var StructTag = "filter"
+
 var (
 	ErrMultipleOperators = errors.New("goql: multiple operators")
 	ErrOperatorNotFound  = errors.New("goql: op not found")
@@ -23,58 +25,94 @@ type FieldSet struct {
 }
 
 // name=eq:john&age=gt:13&married=eq:true
-func Parser(values url.Values, v any) error {
+func Decode(values url.Values, v any) error {
+	used := make(map[string]bool)
+
 	var sets []FieldSet
 
 	rules := Infer(v)
 	for field, rule := range rules {
 		vs := values[field]
-		if len(vs) > 1 {
-			return fmt.Errorf("%w: %s", ErrMultipleOperators, vs[0])
-		}
-
-		v := vs[0]
-		opval := strings.SplitN(v, ":", 2)
-		if len(opval) != 2 {
-			return fmt.Errorf("%w: %s", ErrOperatorNotFound, opval)
-		}
-
-		ops, val := opval[0], opval[1]
-		op, ok := rule.ops.Get(ops)
-		if !ok {
-			return fmt.Errorf("%w: %s", ErrUnknownOperator, ops)
-		}
-
-		switch rule.typ {
-		case RuleTypeString:
-			sets = append(sets, FieldSet{
-				typ: rule.typ,
-				op:  op,
-				key: field,
-				val: val,
-			})
-		case RuleTypeInt:
-			n, err := strconv.Atoi(val)
-			if err != nil {
-				panic(err)
+		for _, v := range vs {
+			opval := strings.SplitN(v, ":", 2)
+			if len(opval) != 2 {
+				return fmt.Errorf("%w: %s", ErrOperatorNotFound, opval)
 			}
-			sets = append(sets, FieldSet{
-				typ: rule.typ,
-				op:  op,
-				key: field,
-				val: n,
-			})
-		case RuleTypeBool:
-			t, err := strconv.ParseBool(val)
-			if err != nil {
-				panic(err)
+
+			ops, val := opval[0], opval[1]
+			op, ok := rule.ops.Get(ops)
+			if !ok {
+				return fmt.Errorf("%w: %s", ErrUnknownOperator, ops)
 			}
-			sets = append(sets, FieldSet{
-				typ: rule.typ,
-				op:  op,
-				key: field,
-				val: t,
-			})
+			usedKey := fmt.Sprintf("%s:%s", field, v)
+			if used[usedKey] {
+				return fmt.Errorf("%w: %s", ErrMultipleOperators, usedKey)
+			}
+			used[usedKey] = true
+
+			switch rule.typ {
+			case RuleTypeString:
+				switch op {
+				case OpIn:
+					// Must be a list of strings.
+					vals, err := splitString(val)
+					if err != nil {
+						return err
+					}
+					sets = append(sets, FieldSet{
+						typ: rule.typ,
+						op:  op,
+						key: field,
+						val: vals,
+					})
+				default:
+					sets = append(sets, FieldSet{
+						typ: rule.typ,
+						op:  op,
+						key: field,
+						val: val,
+					})
+
+				}
+			case RuleTypeInt:
+				switch op {
+				case OpIn:
+					vals, err := ParseInts(strings.Split(val, string(QueryDelimiter)))
+					if err != nil {
+						return err
+					}
+
+					sets = append(sets, FieldSet{
+						typ: rule.typ,
+						op:  op,
+						key: field,
+						val: vals,
+					})
+				default:
+					n, err := strconv.Atoi(val)
+					if err != nil {
+						return err
+					}
+
+					sets = append(sets, FieldSet{
+						typ: rule.typ,
+						op:  op,
+						key: field,
+						val: n,
+					})
+				}
+			case RuleTypeBool:
+				t, err := strconv.ParseBool(val)
+				if err != nil {
+					panic(err)
+				}
+				sets = append(sets, FieldSet{
+					typ: rule.typ,
+					op:  op,
+					key: field,
+					val: t,
+				})
+			}
 		}
 	}
 
@@ -94,17 +132,20 @@ func Infer(i any) map[string]Rule {
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		tag := f.Tag
-		name := coalesce(tag.Get("filter"), f.Name)
+		name := coalesce(tag.Get(StructTag), f.Name)
 
 		// NULL Pointer
 		switch v.Field(i).Kind() {
-		case reflect.Int:
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			rules[name] = IntRule.Copy()
 		case reflect.String:
 			rules[name] = StringRule.Copy()
+		case reflect.Float32, reflect.Float64:
+			rules[name] = FloatRule.Copy()
 		case reflect.Bool:
 			rules[name] = BoolRule.Copy()
 		case reflect.Struct:
+			// Handle time,Time, json.RawMessage, []byte
 		default:
 		}
 	}

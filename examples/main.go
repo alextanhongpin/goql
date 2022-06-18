@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/url"
 	"time"
 
@@ -16,9 +17,9 @@ type User struct {
 }
 
 func main() {
-	v, err := url.ParseQuery(`name=eq:john&age=gt:13&married=eq:true`)
+	v, err := url.ParseQuery(`name=eq:john&age=gt:13&married=eq:true&name=in:football,basketball,tennis&age=in:10,20,100`)
 	if err != nil {
 		panic(err)
 	}
-	goql.Parser(v, &User{})
+	fmt.Println(goql.Decode(v, &User{}))
 }

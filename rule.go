@@ -8,7 +8,7 @@ const (
 	RuleTypeInt
 	RuleTypeFloat
 	RuleTypeBool
-	RuleTypeDate
+	RuleTypeTimestamp
 )
 
 type Rule struct {
@@ -35,8 +35,8 @@ func newPrimitiveRule(typ RuleType) Rule {
 			OpGte:     true,
 			OpBetween: true,
 			OpIn:      true,
+			OpNin:     true,
 			OpIs:      true,
-			OpIsNot:   true,
 		},
 	}
 }

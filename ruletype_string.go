@@ -12,12 +12,12 @@ func _() {
 	_ = x[RuleTypeInt-1]
 	_ = x[RuleTypeFloat-2]
 	_ = x[RuleTypeBool-3]
-	_ = x[RuleTypeDate-4]
+	_ = x[RuleTypeTimestamp-4]
 }
 
-const _RuleType_name = "StringIntFloatBoolDate"
+const _RuleType_name = "StringIntFloatBoolTimestamp"
 
-var _RuleType_index = [...]uint8{0, 6, 9, 14, 18, 22}
+var _RuleType_index = [...]uint8{0, 6, 9, 14, 18, 27}
 
 func (i RuleType) String() string {
 	if i < 0 || i >= RuleType(len(_RuleType_index)-1) {

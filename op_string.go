@@ -15,24 +15,27 @@ func _() {
 	_ = x[OpGt-4]
 	_ = x[OpGte-5]
 	_ = x[OpIn-6]
-	_ = x[OpBetween-7]
-	_ = x[OpIs-8]
-	_ = x[OpIsNot-9]
-	_ = x[OpOverlap-10]
-	_ = x[OpAt-11]
-	_ = x[OpContainedBy-12]
-	_ = x[OpContainedAt-13]
-	_ = x[OpNow-14]
-	_ = x[OpToday-15]
-	_ = x[OpYesterday-16]
-	_ = x[OpContains-17]
-	_ = x[OpSubset-18]
-	_ = x[OpSuperSet-19]
+	_ = x[OpNin-7]
+	_ = x[OpBetween-8]
+	_ = x[OpIs-9]
+	_ = x[OpNot-10]
+	_ = x[OpOverlap-11]
+	_ = x[OpAt-12]
+	_ = x[OpContainedBy-13]
+	_ = x[OpContainedAt-14]
+	_ = x[OpNow-15]
+	_ = x[OpToday-16]
+	_ = x[OpYesterday-17]
+	_ = x[OpAny-18]
+	_ = x[OpAll-19]
+	_ = x[OpContains-20]
+	_ = x[OpSubset-21]
+	_ = x[OpSuperSet-22]
 }
 
-const _Op_name = "EqNeqLtLteGtGteInBetweenIsIsNotOverlapAtContainedByContainedAtNowTodayYesterdayContainsSubsetSuperSet"
+const _Op_name = "EqNeqLtLteGtGteInNinBetweenIsNotOverlapAtContainedByContainedAtNowTodayYesterdayAnyAllContainsSubsetSuperSet"
 
-var _Op_index = [...]uint8{0, 2, 5, 7, 10, 12, 15, 17, 24, 26, 31, 38, 40, 51, 62, 65, 70, 79, 87, 93, 101}
+var _Op_index = [...]uint8{0, 2, 5, 7, 10, 12, 15, 17, 20, 27, 29, 32, 39, 41, 52, 63, 66, 71, 80, 83, 86, 94, 100, 108}
 
 func (i Op) String() string {
 	if i < 0 || i >= Op(len(_Op_index)-1) {
