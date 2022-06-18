@@ -21,5 +21,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(goql.Decode(v, &User{}))
+
+	dec := goql.NewDecoder(&User{})
+	sets, err := dec.Decode(v)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, set := range sets {
+		fmt.Printf("%s %s %s %v\n", set.Typ, set.Op, set.Key, set.Val)
+	}
 }
