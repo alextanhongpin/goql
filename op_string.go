@@ -8,38 +8,66 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[OpEq-0]
-	_ = x[OpNeq-1]
-	_ = x[OpLt-2]
-	_ = x[OpLte-3]
-	_ = x[OpGt-4]
-	_ = x[OpGte-5]
-	_ = x[OpIn-6]
-	_ = x[OpNin-7]
-	_ = x[OpBetween-8]
-	_ = x[OpIs-9]
-	_ = x[OpNot-10]
-	_ = x[OpOverlap-11]
-	_ = x[OpAt-12]
-	_ = x[OpContainedBy-13]
-	_ = x[OpContainedAt-14]
-	_ = x[OpNow-15]
-	_ = x[OpToday-16]
-	_ = x[OpYesterday-17]
-	_ = x[OpAny-18]
-	_ = x[OpAll-19]
-	_ = x[OpContains-20]
-	_ = x[OpSubset-21]
-	_ = x[OpSuperSet-22]
+	_ = x[OpEq-1]
+	_ = x[OpNeq-2]
+	_ = x[OpLt-4]
+	_ = x[OpLte-8]
+	_ = x[OpGt-16]
+	_ = x[OpGte-32]
+	_ = x[OpLike-64]
+	_ = x[OpIlike-128]
+	_ = x[OpIn-256]
+	_ = x[OpIs-512]
+	_ = x[OpFts-1024]
+	_ = x[OpPlFts-2048]
+	_ = x[OpPhFts-4096]
+	_ = x[OpWFts-8192]
+	_ = x[OpCs-16384]
+	_ = x[OpCd-32768]
+	_ = x[OpOv-65536]
+	_ = x[OpSl-131072]
+	_ = x[OpSr-262144]
+	_ = x[OpNxr-524288]
+	_ = x[OpNxl-1048576]
+	_ = x[OpAdj-2097152]
+	_ = x[OpNot-4194304]
+	_ = x[OpOr-8388608]
+	_ = x[OpAnd-16777216]
 }
 
-const _Op_name = "EqNeqLtLteGtGteInNinBetweenIsNotOverlapAtContainedByContainedAtNowTodayYesterdayAnyAllContainsSubsetSuperSet"
+const _Op_name = "EqNeqLtLteGtGteLikeIlikeInIsFtsPlFtsPhFtsWFtsCsCdOvSlSrNxrNxlAdjNotOrAnd"
 
-var _Op_index = [...]uint8{0, 2, 5, 7, 10, 12, 15, 17, 20, 27, 29, 32, 39, 41, 52, 63, 66, 71, 80, 83, 86, 94, 100, 108}
+var _Op_map = map[Op]string{
+	1:        _Op_name[0:2],
+	2:        _Op_name[2:5],
+	4:        _Op_name[5:7],
+	8:        _Op_name[7:10],
+	16:       _Op_name[10:12],
+	32:       _Op_name[12:15],
+	64:       _Op_name[15:19],
+	128:      _Op_name[19:24],
+	256:      _Op_name[24:26],
+	512:      _Op_name[26:28],
+	1024:     _Op_name[28:31],
+	2048:     _Op_name[31:36],
+	4096:     _Op_name[36:41],
+	8192:     _Op_name[41:45],
+	16384:    _Op_name[45:47],
+	32768:    _Op_name[47:49],
+	65536:    _Op_name[49:51],
+	131072:   _Op_name[51:53],
+	262144:   _Op_name[53:55],
+	524288:   _Op_name[55:58],
+	1048576:  _Op_name[58:61],
+	2097152:  _Op_name[61:64],
+	4194304:  _Op_name[64:67],
+	8388608:  _Op_name[67:69],
+	16777216: _Op_name[69:72],
+}
 
 func (i Op) String() string {
-	if i < 0 || i >= Op(len(_Op_index)-1) {
-		return "Op(" + strconv.FormatInt(int64(i), 10) + ")"
+	if str, ok := _Op_map[i]; ok {
+		return str
 	}
-	return _Op_name[_Op_index[i]:_Op_index[i+1]]
+	return "Op(" + strconv.FormatInt(int64(i), 10) + ")"
 }

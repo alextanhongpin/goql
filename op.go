@@ -6,71 +6,39 @@ type Op int
 
 //go:generate stringer -type Op -trimprefix Op
 const (
-	OpEq Op = iota
+	OpEq Op = 1 << iota
 	OpNeq
 	OpLt
 	OpLte
 	OpGt
 	OpGte
+	OpLike
+	OpIlike
 	OpIn
-	OpNin
-	OpBetween
-	OpIs // Literal value, e.g. now(), null
+	OpIs  // IS, checking for exact equality (null,true,false,unknown)
+	OpFts // Full-Text search using to_tsquery
+	OpPlFts
+	OpPhFts
+	OpWFts
+	OpCs  // @>, contains, e.g. ?tags=cs.{example,new}
+	OpCd  // <@, contained in e.g. ?values=cd.{1,2,3}
+	OpOv  // &&, Overlap
+	OpSl  // <<, strictly left of
+	OpSr  // >>, strictly right of
+	OpNxr // &<
+	OpNxl // &>
+	OpAdj // -|-
 	OpNot
-
-	// Range
-	OpOverlap
-
-	// MultiRange
-	// Text
-	// TextSearch
-	// Regex
-
-	// Time range
-	OpAt
-	OpContainedBy
-	OpContainedAt
-	OpNow
-	OpToday
-	OpYesterday
-
-	// Array
-	OpAny
-	OpAll
-	OpContains
-	OpSubset
-	OpSuperSet
-
-	// JSON
+	OpOr
+	OpAnd
 )
 
-type Ops map[Op]bool
-
-func (o Ops) Copy() Ops {
-	oo := make(Ops)
-
-	for k, v := range o {
-		oo[k] = v
-	}
-
-	return oo
-}
-
-func (o Ops) Get(v any) (Op, bool) {
-	switch t := v.(type) {
-	case string:
-		for k := range o {
-			if strings.EqualFold(k.String(), t) {
-				return k, true
-			}
+func ParseOp(op string) (Op, bool) {
+	for i := OpAnd; i > 0; i = i >> 1 {
+		if strings.EqualFold(i.String(), op) {
+			return i, true
 		}
-
-		return 0, false
-	case int:
-		op := Op(t)
-
-		return op, o[op]
-	default:
-		return 0, false
 	}
+
+	return 0, false
 }

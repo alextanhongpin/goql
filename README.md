@@ -9,3 +9,7 @@ Parse query string with rules.
 - nullable types should be supported (how to differentiate text NULL and actual NULL)?
 - array, jsonb operations should be supported
 - how to add validation to the values?
+
+
+Reference:
+- https://postgrest.org/en/stable/api.html

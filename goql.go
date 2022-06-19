@@ -4,14 +4,15 @@ import (
 	"reflect"
 )
 
-var StructTag = "filter"
+const StructTag = "sql"
 
 // Provide different infer, one for query, another for sql, another for mongo etc
-func NewRules(i any) map[string]Rule {
-	rules := make(map[string]Rule)
+func NewRules(i any) map[string]Op {
+	rules := make(map[string]Op)
 
 	v := reflect.Indirect(reflect.ValueOf(i))
 	t := v.Type()
+
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		tag := f.Tag
@@ -20,13 +21,13 @@ func NewRules(i any) map[string]Rule {
 		// NULL Pointer
 		switch v.Field(i).Kind() {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			rules[name] = IntRule.Copy()
+			rules[name] = RuleInt
 		case reflect.String:
-			rules[name] = StringRule.Copy()
+			rules[name] = RuleString
 		case reflect.Float32, reflect.Float64:
-			rules[name] = FloatRule.Copy()
+			rules[name] = RuleFloat
 		case reflect.Bool:
-			rules[name] = BoolRule.Copy()
+			rules[name] = RuleBool
 		case reflect.Struct:
 			// Handle time,Time, json.RawMessage, []byte
 		default:

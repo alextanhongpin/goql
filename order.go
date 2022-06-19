@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strings"
 )
 
@@ -14,16 +15,31 @@ var (
 
 var SortKey = "sort_by"
 
-type SortOrder string
-
 var (
-	SortOrderAscending  SortOrder = "asc"
-	SortOrderDescending SortOrder = "desc"
+	SortOrderAscending  Order = "asc"
+	SortOrderDescending Order = "desc"
+	SortOrderNullsFirst Order = "nullsfirst"
+	SortOrderNullsLast  Order = "nullslast"
 )
+
+type Order string
+
+func (o Order) Valid() bool {
+	switch o {
+	case
+		SortOrderAscending,
+		SortOrderDescending,
+		SortOrderNullsFirst,
+		SortOrderNullsLast:
+		return true
+	default:
+		return false
+	}
+}
 
 type SortBy struct {
 	Field string
-	Order SortOrder
+	Order Order
 	Pos   int
 }
 
@@ -43,16 +59,15 @@ func ParseSortBy(values url.Values) ([]SortBy, error) {
 			return nil, fmt.Errorf("%w: %s", ErrEmptySort, sortBy)
 		}
 
-		var o SortOrder
-		switch {
-		case strings.HasPrefix(s, "-"):
-			s = strings.TrimPrefix(s, "-")
-			o = SortOrderDescending
-		case strings.HasPrefix(s, "+"):
-			s = strings.TrimPrefix(s, "+")
-			o = SortOrderAscending
-		default:
-			o = SortOrderAscending
+		ext := filepath.Ext(s)
+		s = s[:len(s)-len(ext)]
+		ext = strings.ReplaceAll(ext, ".", "")
+
+		o := SortOrderAscending
+		if s != "" {
+			if v := Order(s); v.Valid() {
+				o = v
+			}
 		}
 
 		result[i] = SortBy{
