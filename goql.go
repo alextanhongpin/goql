@@ -7,6 +7,7 @@ import (
 const StructTag = "sql"
 
 // Provide different infer, one for query, another for sql, another for mongo etc
+// TODO: https://github.com/go-pg/pg/blob/782c9d35ba243106ba6445fc753c3ac6a14c3324/orm/table.go
 func NewRules(i any) map[string]Op {
 	rules := make(map[string]Op)
 

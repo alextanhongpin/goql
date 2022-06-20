@@ -53,12 +53,7 @@ func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 		vs := values[field]
 
 		for _, v := range vs {
-			opsval := strings.SplitN(v, Separator, 2)
-			if len(opsval) != 2 {
-				return nil, fmt.Errorf("%w: %s", ErrOperatorNotFound, v)
-			}
-
-			ops, val := opsval[0], opsval[1]
+			ops, val := split2(v, Separator)
 			op, ok := ParseOp(ops)
 			if !ok {
 				return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, ops)
@@ -72,12 +67,7 @@ func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 			if op == OpNot {
 				neg = true
 
-				opsval := strings.SplitN(val, Separator, 2)
-				if len(opsval) != 2 {
-					return nil, fmt.Errorf("%w: %s", ErrOperatorNotFound, v)
-				}
-
-				ops, val = opsval[0], opsval[1]
+				ops, val = split2(val, Separator)
 				op, ok = ParseOp(ops)
 				if !ok {
 					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, ops)
