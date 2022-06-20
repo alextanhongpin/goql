@@ -27,3 +27,27 @@ func splitString(s string) ([]string, error) {
 	r.Comma = QueryDelimiter
 	return r.Read()
 }
+
+func split2(str, by string) (string, string) {
+	paths := strings.SplitN(str, by, 2)
+	switch len(paths) {
+	case 1:
+		return paths[0], ""
+	case 2:
+		return paths[0], paths[1]
+	default:
+		return "", ""
+	}
+}
+
+func Unquote(str string, l, r rune) (string, bool) {
+	if len(str) < 2 {
+		return str, false
+	}
+
+	if rune(str[0]) == l && rune(str[len(str)-1]) == r {
+		return str[1 : len(str)-1], true
+	}
+
+	return str, false
+}

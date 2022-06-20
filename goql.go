@@ -18,12 +18,16 @@ func NewRules(i any) map[string]Op {
 		tag := f.Tag
 		name := coalesce(tag.Get(StructTag), f.Name)
 
+		//if v.Field(i).Kind() == reflect.Pointer {
+		//v.Field(i).Elem().Interface()
+		//}
+
 		// NULL Pointer
 		switch v.Field(i).Kind() {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			rules[name] = RuleInt
 		case reflect.String:
-			rules[name] = RuleString
+			rules[name] = RuleText
 		case reflect.Float32, reflect.Float64:
 			rules[name] = RuleFloat
 		case reflect.Bool:

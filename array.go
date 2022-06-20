@@ -5,18 +5,6 @@ import (
 	"strconv"
 )
 
-func Unquote(str string, l, r rune) (string, bool) {
-	if len(str) < 2 {
-		return str, false
-	}
-
-	if rune(str[0]) == l && rune(str[len(str)-1]) == r {
-		return str[1 : len(str)-1], true
-	}
-
-	return str, false
-}
-
 func ParseInts(ss []string) ([]int, error) {
 	res := make([]int, len(ss))
 

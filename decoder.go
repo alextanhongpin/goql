@@ -41,11 +41,15 @@ func NewDecoder(v any) *Decoder {
 }
 
 func (d *Decoder) Decode(values url.Values) ([]FieldSet, error) {
+	return Decode(d.rules, values)
+}
+
+func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 	used := make(map[string]bool)
 
 	var sets []FieldSet
 
-	for field, rule := range d.rules {
+	for field, rule := range rules {
 		vs := values[field]
 
 		for _, v := range vs {
@@ -79,7 +83,7 @@ func (d *Decoder) Decode(values url.Values) ([]FieldSet, error) {
 					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, ops)
 				}
 
-				if RuleNot&op != op {
+				if RuleNegate&op != op {
 					return nil, fmt.Errorf("%w: %s", ErrInvalidNot, v)
 				}
 
@@ -98,6 +102,7 @@ func (d *Decoder) Decode(values url.Values) ([]FieldSet, error) {
 					"0", "f", "F", "false", "FALSE", "False",
 					"1", "t", "T", "true", "TRUE", "True",
 					"null", "NULL", "Null",
+					"unk", "UNK", "Unk",
 					"unknown", "UNKNOWN", "Unknown":
 				default:
 					return nil, fmt.Errorf("%w: %s", ErrInvalidIs, v)
@@ -111,7 +116,7 @@ func (d *Decoder) Decode(values url.Values) ([]FieldSet, error) {
 			used[usedKey] = true
 
 			switch rule {
-			case RuleString:
+			case RuleText:
 				switch op {
 				case OpIn:
 					val, ok = Unquote(val, '(', ')')

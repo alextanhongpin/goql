@@ -1,9 +1,13 @@
 package goql
 
 const (
-	RuleString = OpEq | OpNeq | OpLt | OpLte | OpGt | OpGte | OpLike | OpIlike | OpIn | OpIs | OpFts | OpPlFts | OpPhFts | OpWFts | OpNot
-	RuleInt    = OpEq | OpNeq | OpLt | OpLte | OpGt | OpGte | OpIn | OpNot
-	RuleFloat  = RuleInt
-	RuleBool   = OpEq | OpNeq | OpIs | OpNot
-	RuleNot    = OpNot | OpLike | OpIlike | OpIs | OpIn
+	RuleComparable = OpEq | OpNeq | OpLt | OpLte | OpGt | OpGte
+	RuleNull       = OpIs | OpNot
+	RuleList       = OpIn | OpNot
+	RuleWhere      = RuleComparable | RuleList | RuleNull
+	RuleNegate     = OpLike | OpIlike | OpIn | OpIs
+	RuleText       = RuleWhere | OpLike | OpIlike | OpIn | OpFts | OpPlFts | OpPhFts | OpWFts
+	RuleInt        = RuleWhere
+	RuleFloat      = RuleWhere
+	RuleBool       = OpEq | OpNeq | OpIs | OpNot
 )

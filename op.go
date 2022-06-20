@@ -4,6 +4,10 @@ import "strings"
 
 type Op int
 
+func (o Op) Has(tgt Op) bool {
+	return o&tgt == tgt
+}
+
 //go:generate stringer -type Op -trimprefix Op
 const (
 	OpEq Op = 1 << iota

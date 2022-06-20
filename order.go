@@ -3,78 +3,72 @@ package goql
 import (
 	"errors"
 	"fmt"
-	"net/url"
-	"path/filepath"
 	"strings"
 )
 
-var (
-	ErrInvalidSort = errors.New("goql: invalid sort")
-	ErrEmptySort   = errors.New("goql: empty sort")
-)
+var ErrInvalidDirection = errors.New("goql: invalid direction")
 
 var SortKey = "sort_by"
 
 var (
-	SortOrderAscending  Order = "asc"
-	SortOrderDescending Order = "desc"
-	SortOrderNullsFirst Order = "nullsfirst"
-	SortOrderNullsLast  Order = "nullslast"
+	DirectionAscending  Direction = "asc"
+	DirectionDescending Direction = "desc"
+	DirectionNullsFirst Direction = "nullsfirst"
+	DirectionNullsLast  Direction = "nullslast"
 )
 
-type Order string
+type Direction string
 
-func (o Order) Valid() bool {
+func (o Direction) Valid() bool {
 	switch o {
 	case
-		SortOrderAscending,
-		SortOrderDescending,
-		SortOrderNullsFirst,
-		SortOrderNullsLast:
+		DirectionAscending,
+		DirectionDescending,
+		DirectionNullsFirst,
+		DirectionNullsLast:
 		return true
 	default:
 		return false
 	}
 }
 
-type SortBy struct {
-	Field string
-	Order Order
-	Pos   int
+type Order struct {
+	Column    string
+	Direction Direction
 }
 
-func ParseSortBy(values url.Values) ([]SortBy, error) {
-	if len(values[SortKey]) > 1 {
-		return nil, fmt.Errorf("%w: multiple sort keys: %s", ErrInvalidSort, values[SortKey])
+func NewOrder(s string) (*Order, error) {
+	field, order := split2(s, ".")
+	if order == "" {
+		return &Order{
+			Column:    field,
+			Direction: DirectionAscending,
+		}, nil
 	}
 
-	sortBy := strings.TrimSpace(values.Get(SortKey))
-	sortables := strings.Split(sortBy, ",")
+	if o := Direction(order); !o.Valid() {
+		return nil, fmt.Errorf("%w: %q", ErrInvalidDirection, order)
+	}
 
-	result := make([]SortBy, len(sortables))
+	return &Order{
+		Column:    field,
+		Direction: Direction(order),
+	}, nil
+}
 
-	for i, s := range sortables {
-		s = strings.TrimSpace(s)
-		if s == "" {
-			return nil, fmt.Errorf("%w: %s", ErrEmptySort, sortBy)
+func ParseOrder(query string) ([]Order, error) {
+	query = strings.TrimSpace(query)
+	orders := strings.Split(query, ",")
+
+	result := make([]Order, len(orders))
+
+	for i, s := range orders {
+		ord, err := NewOrder(s)
+		if err != nil {
+			return nil, err
 		}
 
-		ext := filepath.Ext(s)
-		s = s[:len(s)-len(ext)]
-		ext = strings.ReplaceAll(ext, ".", "")
-
-		o := SortOrderAscending
-		if s != "" {
-			if v := Order(s); v.Valid() {
-				o = v
-			}
-		}
-
-		result[i] = SortBy{
-			Field: s,
-			Order: o,
-			Pos:   i + 1,
-		}
+		result[i] = *ord
 	}
 
 	return result, nil
