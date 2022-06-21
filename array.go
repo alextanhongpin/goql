@@ -5,6 +5,8 @@ import (
 	"strconv"
 )
 
+// TODO: Convert to generic parser.
+
 func ParseInts(ss []string) ([]int, error) {
 	res := make([]int, len(ss))
 

@@ -8,7 +8,11 @@ import (
 	"strings"
 )
 
-const Separator = "."
+const (
+	StructTag    = "sql"
+	ValSeparator = ":"
+	OpSeparator  = "."
+)
 
 var (
 	ErrMultipleOperator = errors.New("goql: multiple op")
@@ -24,20 +28,58 @@ var (
 
 type FieldSet struct {
 	Typ Op
-	Op  Op
 	Key string
 	Val any
-	Neg bool
+
+	Op Op
+
+	//Type string
+	Not bool // sql NOT
+	//Format string // Additional information for parsing data types, e.g. date:20060102 for formatting text date based on yyyymmdd
+	//Tag    string
+	//Column string
+	//Value  any
 }
 
 type Decoder struct {
-	rules map[string]Op
+	rules   map[string]Op
+	columns map[string]column
+	tag     string
 }
 
 func NewDecoder(v any) *Decoder {
-	return &Decoder{
-		rules: NewRules(v),
+	rules := make(map[string]Op)
+	columns := structToColumns(v, StructTag)
+	for name, col := range columns {
+		ops, ok := opsByPgType[col.sqlType]
+		if !ok {
+			ops = RuleWhere
+		}
+		if col.null {
+			ops |= RuleNull
+		}
+
+		rules[name] = ops
 	}
+
+	return &Decoder{
+		columns: columns,
+		rules:   rules,
+		tag:     StructTag,
+		// parsers: func(string) any, error
+	}
+}
+
+func (d *Decoder) SetStructTag(tag string) {
+	if tag == "" {
+		panic("tag cannot be empty")
+	}
+
+	d.tag = tag
+}
+
+func (d *Decoder) SetFieldOps(opsByField map[string]Op) {
+	d.rules = opsByField
 }
 
 func (d *Decoder) Decode(values url.Values) ([]FieldSet, error) {
@@ -49,25 +91,64 @@ func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 
 	var sets []FieldSet
 
+	// TODO: Handle unknown url.values?
+
 	for field, rule := range rules {
 		vs := values[field]
 
 		for _, v := range vs {
-			ops, val := split2(v, Separator)
-			op, ok := ParseOp(ops)
-			if !ok {
-				return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, ops)
+			ops, val := split2(v, ValSeparator)
+
+			var op Op
+			var ok bool
+			var not bool
+
+			subops := strings.Split(ops, OpSeparator)
+			switch len(subops) {
+			case 1:
+				op, ok = ParseOp(subops[0])
+				if !ok {
+					return nil, fmt.Errorf("%w: ops(%s) field(%s)", ErrUnknownOperator, ops, field)
+				}
+			case 2:
+				// Allow chaining of rule with not or is, e.g.
+				// is.not:true, is:not:unknown
+				// not.eq:john, not.in:{1,2,3}
+				op1, ok := ParseOp(subops[0])
+				if !ok {
+					return nil, fmt.Errorf("%w: ops(%s) field(%s)", ErrUnknownOperator, ops, field)
+				}
+				op2, ok := ParseOp(subops[1])
+				if !ok {
+					return nil, fmt.Errorf("%w: ops(%s) field(%s)", ErrUnknownOperator, ops, field)
+				}
+
+				if op1.Is(OpIs) && !op2.Is(OpNot) {
+					return nil, fmt.Errorf("%w: %s %s", ErrUnknownOperator, ops, field)
+				}
+				switch op1 {
+				case OpIs:
+					not = true
+					op = op1
+				case OpNot:
+					not = true
+					op = op2
+				default:
+					return nil, fmt.Errorf("%w: %s %s", ErrUnknownOperator, ops, field)
+				}
+			default:
+				return nil, fmt.Errorf("%w: %s %s", ErrUnknownOperator, ops, field)
 			}
 
-			if rule&op != op {
-				return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, ops)
+			if !rule.Has(op) {
+				return nil, fmt.Errorf("%w: ops(%s) field(%s)", ErrUnknownOperator, ops, field)
 			}
 
-			var neg bool
-			if op == OpNot {
-				neg = true
+			switch {
+			case op.Is(OpNot):
+				not = true
 
-				ops, val = split2(val, Separator)
+				ops, val = split2(val, ":")
 				op, ok = ParseOp(ops)
 				if !ok {
 					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, ops)
@@ -80,13 +161,7 @@ func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 				if rule&op != op {
 					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, ops)
 				}
-			}
-
-			if op == OpIs {
-				if strings.HasPrefix(val, "not.") {
-					neg = true
-					val = strings.TrimPrefix(val, "not.")
-				}
+			case op.Is(OpIs):
 				switch val {
 				case
 					"0", "f", "F", "false", "FALSE", "False",
@@ -105,11 +180,12 @@ func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 			}
 			used[usedKey] = true
 
+			// TODO: Handle parsing for all types based on parser.
 			switch rule {
 			case RuleText:
 				switch op {
 				case OpIn:
-					val, ok = Unquote(val, '(', ')')
+					val, ok = Unquote(val, '{', '}')
 					if !ok {
 						return nil, fmt.Errorf("%w: missing parantheses: %s", ErrInvalidArray, val)
 					}
@@ -124,7 +200,7 @@ func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 						Op:  op,
 						Key: field,
 						Val: vals,
-						Neg: neg,
+						Not: not,
 					})
 				default:
 					sets = append(sets, FieldSet{
@@ -132,14 +208,14 @@ func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 						Op:  op,
 						Key: field,
 						Val: val,
-						Neg: neg,
+						Not: not,
 					})
 
 				}
 			case RuleInt:
 				switch op {
 				case OpIn:
-					val, ok = Unquote(val, '(', ')')
+					val, ok = Unquote(val, '{', '}')
 					if !ok {
 						return nil, fmt.Errorf("%w: missing parantheses: %s", ErrInvalidArray, val)
 					}
@@ -154,7 +230,7 @@ func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 						Op:  op,
 						Key: field,
 						Val: vals,
-						Neg: neg,
+						Not: not,
 					})
 				default:
 					n, err := strconv.Atoi(val)
@@ -167,7 +243,7 @@ func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 						Op:  op,
 						Key: field,
 						Val: n,
-						Neg: neg,
+						Not: not,
 					})
 				}
 			case RuleBool:
@@ -180,7 +256,7 @@ func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 					Op:  op,
 					Key: field,
 					Val: t,
-					Neg: neg,
+					Not: not,
 				})
 			}
 		}
