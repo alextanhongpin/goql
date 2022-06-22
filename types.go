@@ -21,8 +21,8 @@ var (
 	jsonRawMessageType = reflect.TypeOf((*json.RawMessage)(nil)).Elem()
 )
 
-func sqlType(typ reflect.Type) string {
-	switch typ {
+func sqlType(t reflect.Type) string {
+	switch t {
 	case timeType, sqlNullTimeType:
 		return pgTypeTimestampTz
 	case ipType:
@@ -41,7 +41,7 @@ func sqlType(typ reflect.Type) string {
 		return pgTypeJSONB
 	}
 
-	switch typ.Kind() {
+	switch t.Kind() {
 	case reflect.Int8, reflect.Uint8, reflect.Int16:
 		return pgTypeSmallint
 	case reflect.Uint16, reflect.Int32:
@@ -62,11 +62,51 @@ func sqlType(typ reflect.Type) string {
 	case reflect.Map, reflect.Struct:
 		return pgTypeJSONB
 	case reflect.Array, reflect.Slice:
-		if typ.Elem().Kind() == reflect.Uint8 {
+		if t.Elem().Kind() == reflect.Uint8 {
 			return pgTypeBytea
 		}
 		return pgTypeJSONB
 	default:
-		return typ.Kind().String()
+		return t.Kind().String()
 	}
+}
+
+func getSQLType(t reflect.Type) (pt string, null bool, array bool) {
+	/*
+		Handles only the following
+		field *Struct
+		field Struct
+		field *[]*Struct
+		field *[]Struct
+		field []*Struct
+	*/
+
+	// Unwraps all pointer first, could be slice or base type.
+	switch t.Kind() {
+	case reflect.Pointer:
+		null = true
+
+		// Get the value of the pointer.
+		t = t.Elem()
+	}
+
+	switch t.Kind() {
+	case reflect.Slice:
+		array = true
+
+		// Get the item of the slice.
+		t = t.Elem()
+
+		// Check the item if it is a pointer.
+		switch t.Kind() {
+		case reflect.Pointer:
+			null = true
+
+			t = t.Elem()
+		}
+	}
+
+	pt = sqlType(t)
+
+	return
 }

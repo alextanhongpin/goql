@@ -5,110 +5,95 @@ import (
 	"strings"
 )
 
-type column struct {
-	null    bool
-	array   bool
-	sqlType string
-	name    string
-	parse   string
-	tag     string
+type Column struct {
+	IsNull  bool
+	IsArray bool
+	SQLType string
+	Name    string
+	Format  string
+	Tag     string
 }
 
 // Provide different infer, one for query, another for sql, another for mongo etc
 // TODO: https://github.com/go-pg/pg/blob/782c9d35ba243106ba6445fc753c3ac6a14c3324/orm/table.go
-func structToColumns(unk any, tagKey string) map[string]column {
-	columnByFieldName := make(map[string]column)
+func StructToColumns(unk any, key string) map[string]Column {
+	columnByFieldName := make(map[string]Column)
 
 	v := reflect.Indirect(reflect.ValueOf(unk))
 	t := v.Type()
 
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
-		tag := f.Tag.Get(tagKey)
+		tag := f.Tag.Get(key)
+		if tag == "-" {
+			continue
+		}
 
-		c := column{tag: tag}
+		c := Column{Tag: tag}
+
 		if tag == "" {
 			tag = f.Name
 		}
 
-		tagValues := strings.Split(tag, ",")
-		switch len(tagValues) {
+		values := strings.Split(tag, ",")
+		switch len(values) {
 		case 1:
-			c.name = tagValues[0]
+			c.Name = values[0]
 		case 2, 3, 4:
-			c.name = tagValues[0]
-			if tagValues[1] != "null" {
-				panic("expected null as second argument")
+			c.Name = values[0]
+			isNull, valid := IsSQLNull(values[1])
+			if !valid {
+				panic("goql: second argument must be null or notnull")
 			}
-			c.null = tagValues[1] == "null"
-			for _, val := range tagValues[2:] {
+
+			c.IsNull = isNull
+
+			for _, val := range values[2:] {
 				k, v := split2(val, ":")
 				switch k {
 				case "type":
-					if strings.HasPrefix(v, "[]") {
-						v = strings.TrimPrefix(v, "[]")
-						c.array = true
-					}
-
-					c.sqlType = v
-				case "parse":
-					c.parse = v
+					v, c.IsArray = ParseSQLArray(v)
+				case "format":
+					c.Format = v
 				default:
-					panic("unexpected tag")
+					panic("goql: unexpected tag")
 				}
 			}
 		default:
-			panic("invalid tag")
+			panic("goql: invalid tag")
 		}
 
-		if c.sqlType != "" {
-			columnByFieldName[c.name] = c
+		if c.SQLType != "" {
+			columnByFieldName[c.Name] = c
 			continue
 		}
 
-		ft := f.Type
-
-		/*
-			Handles only the following
-			field *Struct
-			field Struct
-			field []*Struct
-			field *[]*Struct
-			field *[]Struct
-		*/
-
-		switch ft.Kind() {
-		case reflect.Pointer:
-			c.null = true
-
-			// Get the value of the pointer.
-			ft = ft.Elem()
-		}
-
-		switch ft.Kind() {
-		case reflect.Pointer:
-			c.null = true
-
-			// Get the value of the pointer.
-			ft = ft.Elem()
-		case reflect.Slice:
-			c.array = true
-
-			// Get the item of the slice.
-			ft = ft.Elem()
-
-			// Check the item if it is a pointer.
-			switch ft.Kind() {
-			case reflect.Pointer:
-				c.null = true
-
-				ft = ft.Elem()
-			}
-		}
-
-		c.sqlType = sqlType(ft)
-		columnByFieldName[c.name] = c
+		sqlType, null, array := getSQLType(f.Type)
+		c.SQLType = sqlType
+		c.IsNull = null
+		c.IsArray = array
+		columnByFieldName[c.Name] = c
 	}
 
 	return columnByFieldName
+}
+
+func IsSQLNull(s string) (null bool, valid bool) {
+	switch s {
+	case "null", "notnull":
+		null = s == "null"
+		valid = true
+	}
+
+	return
+}
+
+func ParseSQLArray(s string) (base string, array bool) {
+	base = s
+	array = strings.HasPrefix(s, "[]")
+	if array {
+		base = strings.TrimPrefix(s, "[]")
+	}
+
+	return
 }

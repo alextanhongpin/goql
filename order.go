@@ -8,8 +8,6 @@ import (
 
 var ErrInvalidDirection = errors.New("goql: invalid direction")
 
-var SortKey = "sort_by"
-
 var (
 	DirectionAscending  Direction = "asc"
 	DirectionDescending Direction = "desc"

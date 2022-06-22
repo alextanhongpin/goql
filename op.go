@@ -24,18 +24,24 @@ const (
 	OpIlike                // ilike, same as like, but case insensitive, e.g. name=ilike:john%
 	OpIn                   // in, e.g. name=in:{1,2,3| becomes name in (1,2,3). The curly brackets is needed to indicate that the whole value is an array, since for array columns there's no way to differentiate for a single value.
 	OpIs                   // is, checking for exact equality (null,true,false,unknown), e.g. age=is:null
-	OpFts                  // Full-Text search using to_tsquery
-	OpPlFts                // Full-Text search using plain to tsquery
-	OpPhFts                // Full-Text search using phrase to tsquery
-	OpWFts                 // Full-Text search using word.
-	OpCs                   // @>, contains, e.g. ?tags=cs.{example,new}
-	OpCd                   // <@, contained in e.g. ?values=cd.{1,2,3}
-	OpOv                   // &&, Overlap
-	OpSl                   // <<, strictly left of
-	OpSr                   // >>, strictly right of
-	OpNxr                  // &<
-	OpNxl                  // &>
-	OpAdj                  // -|-
+
+	// Full-Text search.
+	OpFts   // Full-Text search using to_tsquery
+	OpPlFts // Full-Text search using plain to tsquery
+	OpPhFts // Full-Text search using phrase to tsquery
+	OpWFts  // Full-Text search using word.
+
+	// https://www.postgresql.org/docs/14/functions-range.html
+	OpCs  // @>, contains, e.g. ?tags=cs.{example,new}
+	OpCd  // <@, contained in e.g. ?values=cd.{1,2,3}
+	OpOv  // &&, Overlap
+	OpSl  // <<, strictly left of
+	OpSr  // >>, strictly right of
+	OpNxr // &<
+	OpNxl // &>
+	OpAdj // -|-
+
+	// Conjunctions.
 	OpNot
 	OpOr
 	OpAnd

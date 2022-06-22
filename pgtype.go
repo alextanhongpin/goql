@@ -47,3 +47,36 @@ const (
 	// Binary Data Types
 	pgTypeBytea = "bytea" // binary string
 )
+
+func IsPgType(t string) bool {
+	switch t {
+	case
+		pgTypeTimestamp,
+		pgTypeTimestampTz,
+		pgTypeDate,
+		pgTypeTime,
+		pgTypeTimeTz,
+		pgTypeInterval,
+		pgTypeInet,
+		pgTypeCidr,
+		pgTypeMacaddr,
+		pgTypeBoolean,
+		pgTypeReal,
+		pgTypeDoublePrecision,
+		pgTypeSmallint,
+		pgTypeInteger,
+		pgTypeBigint,
+		pgTypeSmallserial,
+		pgTypeSerial,
+		pgTypeBigserial,
+		pgTypeVarchar,
+		pgTypeChar,
+		pgTypeText,
+		pgTypeJSON,
+		pgTypeJSONB,
+		pgTypeBytea:
+		return true
+	default:
+		return false
+	}
+}

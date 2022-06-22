@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strconv"
 	"strings"
 )
 
@@ -27,46 +26,55 @@ var (
 )
 
 type FieldSet struct {
-	Typ Op
-	Key string
-	Val any
-
-	Op Op
-
-	//Type string
-	Not bool // sql NOT
-	//Format string // Additional information for parsing data types, e.g. date:20060102 for formatting text date based on yyyymmdd
-	//Tag    string
-	//Column string
-	//Value  any
+	Name    string
+	Value   any
+	SQLType string
+	Not     bool
+	Format  string
+	Tag     string
+	Op      string
 }
 
 type Decoder struct {
-	rules   map[string]Op
-	columns map[string]column
+	ops     map[string]Op
+	columns map[string]Column
+	parsers map[string]parserFn
 	tag     string
 }
 
 func NewDecoder(v any) *Decoder {
-	rules := make(map[string]Op)
-	columns := structToColumns(v, StructTag)
+	opsByField := make(map[string]Op)
+	columns := StructToColumns(v, StructTag)
+	parsers := make(map[string]parserFn)
+	for k, v := range defaultParsers {
+		parsers[k] = v
+	}
+
 	for name, col := range columns {
-		ops, ok := opsByPgType[col.sqlType]
-		if !ok {
-			ops = RuleWhere
-		}
-		if col.null {
-			ops |= RuleNull
+		// TODO: Allow registering custom types.
+		if !IsPgType(col.SQLType) {
+			panic("goql: not a sql type")
 		}
 
-		rules[name] = ops
+		// By default, all datatypes are comparable.
+		ops := OpsComparable
+
+		if col.IsNull {
+			ops |= OpsNull
+		}
+
+		if col.IsArray {
+			ops |= OpsRange
+		}
+
+		opsByField[name] = ops
 	}
 
 	return &Decoder{
 		columns: columns,
-		rules:   rules,
+		ops:     opsByField,
 		tag:     StructTag,
-		// parsers: func(string) any, error
+		parsers: parsers,
 	}
 }
 
@@ -79,22 +87,26 @@ func (d *Decoder) SetStructTag(tag string) {
 }
 
 func (d *Decoder) SetFieldOps(opsByField map[string]Op) {
-	d.rules = opsByField
+	d.ops = opsByField
 }
 
 func (d *Decoder) Decode(values url.Values) ([]FieldSet, error) {
-	return Decode(d.rules, values)
+	return Decode(d.ops, d.columns, d.parsers, values)
 }
 
-func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
+func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]parserFn, values url.Values) ([]FieldSet, error) {
 	used := make(map[string]bool)
 
 	var sets []FieldSet
 
 	// TODO: Handle unknown url.values?
 
-	for field, rule := range rules {
+	for field, rule := range ops {
 		vs := values[field]
+		col, ok := columns[field]
+		if !ok {
+			return nil, errors.New("goql: column not found")
+		}
 
 		for _, v := range vs {
 			ops, val := split2(v, ValSeparator)
@@ -154,7 +166,7 @@ func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, ops)
 				}
 
-				if RuleNegate&op != op {
+				if OpsNot.Has(op) {
 					return nil, fmt.Errorf("%w: %s", ErrInvalidNot, v)
 				}
 
@@ -181,82 +193,51 @@ func Decode(rules map[string]Op, values url.Values) ([]FieldSet, error) {
 			used[usedKey] = true
 
 			// TODO: Handle parsing for all types based on parser.
-			switch rule {
-			case RuleText:
-				switch op {
-				case OpIn:
-					val, ok = Unquote(val, '{', '}')
-					if !ok {
-						return nil, fmt.Errorf("%w: missing parantheses: %s", ErrInvalidArray, val)
-					}
+			parser, ok := parsers[col.SQLType]
+			if !ok {
+				panic(fmt.Errorf("goql: parser not found: %+v", col))
+			}
 
-					// Must be a list of strings.
-					vals, err := splitString(val)
-					if err != nil {
-						return nil, err
-					}
-					sets = append(sets, FieldSet{
-						Typ: rule,
-						Op:  op,
-						Key: field,
-						Val: vals,
-						Not: not,
-					})
-				default:
-					sets = append(sets, FieldSet{
-						Typ: rule,
-						Op:  op,
-						Key: field,
-						Val: val,
-						Not: not,
-					})
-
+			switch {
+			case op.Is(OpIn), col.IsArray:
+				val, ok = Unquote(val, '{', '}')
+				if !ok {
+					return nil, fmt.Errorf("%w: missing parantheses: %s", ErrInvalidArray, val)
 				}
-			case RuleInt:
-				switch op {
-				case OpIn:
-					val, ok = Unquote(val, '{', '}')
-					if !ok {
-						return nil, fmt.Errorf("%w: missing parantheses: %s", ErrInvalidArray, val)
-					}
 
-					vals, err := ParseInts(strings.Split(val, string(QueryDelimiter)))
-					if err != nil {
-						return nil, err
-					}
-
-					sets = append(sets, FieldSet{
-						Typ: rule,
-						Op:  op,
-						Key: field,
-						Val: vals,
-						Not: not,
-					})
-				default:
-					n, err := strconv.Atoi(val)
-					if err != nil {
-						return nil, fmt.Errorf("%w: %s", ErrInvalidInt, val)
-					}
-
-					sets = append(sets, FieldSet{
-						Typ: rule,
-						Op:  op,
-						Key: field,
-						Val: n,
-						Not: not,
-					})
-				}
-			case RuleBool:
-				t, err := strconv.ParseBool(val)
+				// Must be a list of strings.
+				vals, err := splitString(val)
 				if err != nil {
-					return nil, ErrInvalidBool
+					return nil, err
 				}
+				var format []string
+				if col.Format != "" {
+					format = append(format, col.Format)
+				}
+
+				res, err := MapAny(vals, format, parser)
+				if err != nil {
+					return nil, err
+				}
+
 				sets = append(sets, FieldSet{
-					Typ: rule,
-					Op:  op,
-					Key: field,
-					Val: t,
-					Not: not,
+					Name:    field,
+					Value:   res,
+					SQLType: col.SQLType,
+					Not:     not,
+					Format:  col.Format,
+					Tag:     col.Tag,
+					Op:      op.String(),
+				})
+			default:
+				sets = append(sets, FieldSet{
+					Name:    field,
+					Value:   val,
+					SQLType: col.SQLType,
+					Not:     not,
+					Format:  col.Format,
+					Tag:     col.Tag,
+					Op:      op.String(),
 				})
 			}
 		}
