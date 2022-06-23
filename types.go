@@ -10,7 +10,6 @@ import (
 
 var (
 	timeType           = reflect.TypeOf((*time.Time)(nil)).Elem()
-	sqlNullTimeType    = reflect.TypeOf((*sql.NullTime)(nil)).Elem()
 	ipType             = reflect.TypeOf((*net.IP)(nil)).Elem()
 	ipNetType          = reflect.TypeOf((*net.IPNet)(nil)).Elem()
 	scannerType        = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
@@ -18,12 +17,27 @@ var (
 	nullFloatType      = reflect.TypeOf((*sql.NullFloat64)(nil)).Elem()
 	nullIntType        = reflect.TypeOf((*sql.NullInt64)(nil)).Elem()
 	nullStringType     = reflect.TypeOf((*sql.NullString)(nil)).Elem()
+	nullTimeType       = reflect.TypeOf((*sql.NullTime)(nil)).Elem()
 	jsonRawMessageType = reflect.TypeOf((*json.RawMessage)(nil)).Elem()
 )
 
+func sqlNullType(t reflect.Type) bool {
+	switch t {
+	case
+		nullBoolType,
+		nullFloatType,
+		nullIntType,
+		nullStringType,
+		nullTimeType:
+		return true
+	default:
+		return false
+	}
+}
+
 func sqlType(t reflect.Type) string {
 	switch t {
-	case timeType, sqlNullTimeType:
+	case timeType, nullTimeType:
 		return pgTypeTimestampTz
 	case ipType:
 		return pgTypeInet
@@ -102,6 +116,9 @@ func GetSQLType(t reflect.Type) (pt string, null bool, array bool) {
 	}
 
 	pt = sqlType(t)
+	if !null {
+		null = sqlNullType(t)
+	}
 
 	return
 }
