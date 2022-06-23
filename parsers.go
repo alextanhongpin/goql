@@ -7,31 +7,33 @@ import (
 
 type parserFn func(s string, format ...string) (any, error)
 
-var defaultParsers = map[string]parserFn{
-	pgTypeTimestamp:       parseTime,
-	pgTypeTimestampTz:     parseTime,
-	pgTypeDate:            parseTime,
-	pgTypeTime:            parseTime,
-	pgTypeTimeTz:          parseTime,
-	pgTypeInterval:        parseNop,
-	pgTypeInet:            parseNop,
-	pgTypeCidr:            parseNop,
-	pgTypeMacaddr:         parseNop,
-	pgTypeBoolean:         parseBool,
-	pgTypeReal:            parseFloat32,
-	pgTypeDoublePrecision: parseFloat64,
-	pgTypeSmallint:        parseInt16,
-	pgTypeInteger:         parseInt32,
-	pgTypeBigint:          parseInt64,
-	pgTypeSmallserial:     parseNop,
-	pgTypeSerial:          parseNop,
-	pgTypeBigserial:       parseNop,
-	pgTypeVarchar:         parseText,
-	pgTypeChar:            parseText,
-	pgTypeText:            parseText,
-	pgTypeJSON:            parseText,
-	pgTypeJSONB:           parseText,
-	pgTypeBytea:           parseText,
+func NewParsers() map[string]parserFn {
+	return map[string]parserFn{
+		pgTypeTimestamp:       parseTime,
+		pgTypeTimestampTz:     parseTime,
+		pgTypeDate:            parseTime,
+		pgTypeTime:            parseTime,
+		pgTypeTimeTz:          parseTime,
+		pgTypeInterval:        parseNop,
+		pgTypeInet:            parseNop,
+		pgTypeCidr:            parseNop,
+		pgTypeMacaddr:         parseNop,
+		pgTypeBoolean:         parseBool,
+		pgTypeReal:            parseFloat32,
+		pgTypeDoublePrecision: parseFloat64,
+		pgTypeSmallint:        parseInt16,
+		pgTypeInteger:         parseInt32,
+		pgTypeBigint:          parseInt64,
+		pgTypeSmallserial:     parseNop,
+		pgTypeSerial:          parseNop,
+		pgTypeBigserial:       parseNop,
+		pgTypeVarchar:         parseText,
+		pgTypeChar:            parseText,
+		pgTypeText:            parseText,
+		pgTypeJSON:            parseText,
+		pgTypeJSONB:           parseText,
+		pgTypeBytea:           parseText,
+	}
 }
 
 func MapAny[T any](in []string, format []string, fn func(string, ...string) (T, error)) ([]T, error) {

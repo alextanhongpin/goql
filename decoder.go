@@ -15,24 +15,26 @@ const (
 
 var (
 	ErrMultipleOperator = errors.New("goql: multiple op")
-	ErrOperatorNotFound = errors.New("goql: op not found")
 	ErrUnknownOperator  = errors.New("goql: unknown op")
+	ErrBadOperator      = errors.New("goql: bad op")
 	ErrInvalidNot       = errors.New("goql: invalid not")
-	ErrInvalidIs        = errors.New("goql: invalid is")
+	ErrInvalidIs        = errors.New("goql: 'IS' must be followed by {true, false, null, unknown}")
 	ErrInvalidArray     = errors.New("goql: invalid array")
-	ErrInvalidBool      = errors.New("goql: invalid bool")
-	ErrInvalidFloat     = errors.New("goql: invalid float")
-	ErrInvalidInt       = errors.New("goql: invalid int")
+	ErrUnknownField     = errors.New("goql: unknown field")
+	ErrUnknownParser    = errors.New("goql: unknown parser")
 )
 
 type FieldSet struct {
-	Name    string
-	Value   any
-	SQLType string
-	Not     bool
-	Format  string
-	Tag     string
-	Op      string
+	Name     string
+	Value    any
+	RawValue string
+	SQLType  string
+	Not      bool
+	IsNull   bool
+	IsArray  bool
+	Format   string
+	Tag      string
+	Op       string
 }
 
 type Decoder struct {
@@ -43,19 +45,11 @@ type Decoder struct {
 }
 
 func NewDecoder(v any) *Decoder {
+	parsers := NewParsers()
 	opsByField := make(map[string]Op)
 	columns := StructToColumns(v, StructTag)
-	parsers := make(map[string]parserFn)
-	for k, v := range defaultParsers {
-		parsers[k] = v
-	}
 
 	for name, col := range columns {
-		// TODO: Allow registering custom types.
-		if !IsPgType(col.SQLType) {
-			panic("goql: not a sql type")
-		}
-
 		// By default, all datatypes are comparable.
 		ops := OpsComparable
 
@@ -65,6 +59,10 @@ func NewDecoder(v any) *Decoder {
 
 		if col.IsArray {
 			ops |= OpsRange
+		}
+
+		if IsPgText(col.SQLType) {
+			ops |= OpsText
 		}
 
 		opsByField[name] = ops
@@ -90,37 +88,39 @@ func (d *Decoder) SetFieldOps(opsByField map[string]Op) {
 	d.ops = opsByField
 }
 
+func (d *Decoder) SetParsers(parsers map[string]parserFn) {
+	d.parsers = parsers
+}
+
 func (d *Decoder) Decode(values url.Values) ([]FieldSet, error) {
 	return Decode(d.ops, d.columns, d.parsers, values)
 }
 
 func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]parserFn, values url.Values) ([]FieldSet, error) {
-	used := make(map[string]bool)
+	cache := make(map[string]bool)
 
 	var sets []FieldSet
 
-	// TODO: Handle unknown url.values?
-
 	for field, rule := range ops {
-		vs := values[field]
 		col, ok := columns[field]
 		if !ok {
-			return nil, errors.New("goql: column not found")
+			return nil, fmt.Errorf("%w: %s", ErrUnknownField, field)
 		}
 
-		for _, v := range vs {
+		for _, v := range values[field] {
 			ops, val := split2(v, ValSeparator)
 
 			var op Op
 			var ok bool
 			var not bool
 
+			// ops can be chained, e.g. is.not:true, not.in:{1,2,3}
 			subops := strings.Split(ops, OpSeparator)
 			switch len(subops) {
 			case 1:
 				op, ok = ParseOp(subops[0])
 				if !ok {
-					return nil, fmt.Errorf("%w: ops(%s) field(%s)", ErrUnknownOperator, ops, field)
+					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, v)
 				}
 			case 2:
 				// Allow chaining of rule with not or is, e.g.
@@ -128,74 +128,66 @@ func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]par
 				// not.eq:john, not.in:{1,2,3}
 				op1, ok := ParseOp(subops[0])
 				if !ok {
-					return nil, fmt.Errorf("%w: ops(%s) field(%s)", ErrUnknownOperator, ops, field)
-				}
-				op2, ok := ParseOp(subops[1])
-				if !ok {
-					return nil, fmt.Errorf("%w: ops(%s) field(%s)", ErrUnknownOperator, ops, field)
+					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, v)
 				}
 
-				if op1.Is(OpIs) && !op2.Is(OpNot) {
-					return nil, fmt.Errorf("%w: %s %s", ErrUnknownOperator, ops, field)
+				op2, ok := ParseOp(subops[1])
+				if !ok {
+					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, v)
 				}
+
+				if !IsOpChainable(op1, op2) {
+					return nil, fmt.Errorf("%w: %s", ErrBadOperator, v)
+				}
+
+				not = true
+
 				switch op1 {
 				case OpIs:
-					not = true
 					op = op1
+					// OpIs must have value: true, false, unknown or null.
+					if !sqlIs(val) {
+						return nil, fmt.Errorf("%w: %s", ErrInvalidIs, v)
+					}
 				case OpNot:
-					not = true
 					op = op2
 				default:
-					return nil, fmt.Errorf("%w: %s %s", ErrUnknownOperator, ops, field)
+					return nil, fmt.Errorf("%w: %s", ErrBadOperator, v)
 				}
 			default:
-				return nil, fmt.Errorf("%w: %s %s", ErrUnknownOperator, ops, field)
+				return nil, fmt.Errorf("%w: %s", ErrBadOperator, v)
 			}
 
 			if !rule.Has(op) {
-				return nil, fmt.Errorf("%w: ops(%s) field(%s)", ErrUnknownOperator, ops, field)
+				return nil, fmt.Errorf("%w: %s", ErrBadOperator, v)
 			}
 
-			switch {
-			case op.Is(OpNot):
-				not = true
-
-				ops, val = split2(val, ":")
-				op, ok = ParseOp(ops)
-				if !ok {
-					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, ops)
-				}
-
-				if OpsNot.Has(op) {
-					return nil, fmt.Errorf("%w: %s", ErrInvalidNot, v)
-				}
-
-				if rule&op != op {
-					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, ops)
-				}
-			case op.Is(OpIs):
-				switch val {
-				case
-					"0", "f", "F", "false", "FALSE", "False",
-					"1", "t", "T", "true", "TRUE", "True",
-					"null", "NULL", "Null",
-					"unk", "UNK", "Unk",
-					"unknown", "UNKNOWN", "Unknown":
-				default:
-					return nil, fmt.Errorf("%w: %s", ErrInvalidIs, v)
-				}
+			cacheKey := fmt.Sprintf("%s:%s:%t", field, op, not)
+			if cache[cacheKey] {
+				return nil, fmt.Errorf("%w: %q.%q", ErrMultipleOperator, field, strings.ToLower(op.String()))
 			}
+			cache[cacheKey] = true
 
-			usedKey := fmt.Sprintf("%s:%s", field, v)
-			if used[usedKey] {
-				return nil, fmt.Errorf("%w: %s", ErrMultipleOperator, usedKey)
-			}
-			used[usedKey] = true
-
-			// TODO: Handle parsing for all types based on parser.
 			parser, ok := parsers[col.SQLType]
 			if !ok {
-				panic(fmt.Errorf("goql: parser not found: %+v", col))
+				return nil, fmt.Errorf("%w: %s", ErrUnknownParser, col.SQLType)
+			}
+
+			fs := FieldSet{
+				Name:     field,
+				SQLType:  col.SQLType,
+				IsNull:   col.IsNull,
+				IsArray:  col.IsArray,
+				Not:      not,
+				Format:   col.Format,
+				Tag:      col.Tag,
+				Op:       op.String(),
+				RawValue: val,
+			}
+
+			var format []string
+			if col.Format != "" {
+				format = append(format, col.Format)
 			}
 
 			switch {
@@ -205,14 +197,9 @@ func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]par
 					return nil, fmt.Errorf("%w: missing parantheses: %s", ErrInvalidArray, val)
 				}
 
-				// Must be a list of strings.
 				vals, err := splitString(val)
 				if err != nil {
 					return nil, err
-				}
-				var format []string
-				if col.Format != "" {
-					format = append(format, col.Format)
 				}
 
 				res, err := MapAny(vals, format, parser)
@@ -220,26 +207,20 @@ func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]par
 					return nil, err
 				}
 
-				sets = append(sets, FieldSet{
-					Name:    field,
-					Value:   res,
-					SQLType: col.SQLType,
-					Not:     not,
-					Format:  col.Format,
-					Tag:     col.Tag,
-					Op:      op.String(),
-				})
+				fs.Value = res
 			default:
-				sets = append(sets, FieldSet{
-					Name:    field,
-					Value:   val,
-					SQLType: col.SQLType,
-					Not:     not,
-					Format:  col.Format,
-					Tag:     col.Tag,
-					Op:      op.String(),
-				})
+				if col.IsNull && (val == "null" || val == "") {
+					fs.Value = nil
+				} else {
+					res, err := parser(val, format...)
+					if err != nil {
+						return nil, err
+					}
+					fs.Value = res
+				}
 			}
+
+			sets = append(sets, fs)
 		}
 	}
 

@@ -2,6 +2,20 @@ package goql
 
 import "strings"
 
+/*
+
+By default, all datatypes are comparable: =, <>, <, <=, >, >=
+Since WHERE col IN (...) is pretty common in SQL, OpIn is added for most types.
+If the datatype can be NULL, then OpIs will be appended.
+*/
+const (
+	OpsComparable = OpEq | OpNeq | OpLt | OpLte | OpGt | OpGte | OpIn
+	OpsNull       = OpIs | OpNot
+	OpsNot        = OpLike | OpIlike | OpIn
+	OpsText       = OpsComparable | OpLike | OpIlike | OpIn | OpFts | OpPlFts | OpPhFts | OpWFts
+	OpsRange      = OpCs | OpCd | OpOv | OpSl | OpSr | OpNxr | OpNxl | OpAdj
+)
+
 type Op int
 
 func (o Op) Has(tgt Op) bool {
@@ -32,8 +46,8 @@ const (
 	OpWFts  // Full-Text search using word.
 
 	// https://www.postgresql.org/docs/14/functions-range.html
-	OpCs  // @>, contains, e.g. ?tags=cs.{example,new}
-	OpCd  // <@, contained in e.g. ?values=cd.{1,2,3}
+	OpCs  // @>, contains, e.g. ?tags=cs:{example,new}
+	OpCd  // <@, contained in e.g. ?values=cd:{1,2,3}
 	OpOv  // &&, Overlap
 	OpSl  // <<, strictly left of
 	OpSr  // >>, strictly right of
@@ -55,4 +69,29 @@ func ParseOp(op string) (Op, bool) {
 	}
 
 	return 0, false
+}
+
+// IsOpChainable returns if an operator can be chained.
+func IsOpChainable(op1, op2 Op) bool {
+	switch op1 {
+	case OpIs:
+		return op2 == OpNot
+	case OpNot:
+		return OpsNot.Has(op2)
+	default:
+		return false
+	}
+}
+
+func sqlIs(unk string) bool {
+	switch unk {
+	case
+		"0", "f", "F", "n", "no", "false", "FALSE", "False",
+		"1", "t", "T", "y", "yes", "true", "TRUE", "True",
+		"null", "NULL", "Null",
+		"unknown", "UNKNOWN", "Unknown":
+		return true
+	default:
+		return false
+	}
 }

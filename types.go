@@ -71,13 +71,11 @@ func sqlType(t reflect.Type) string {
 	}
 }
 
-func getSQLType(t reflect.Type) (pt string, null bool, array bool) {
+func GetSQLType(t reflect.Type) (pt string, null bool, array bool) {
 	/*
 		Handles only the following
 		field *Struct
 		field Struct
-		field *[]*Struct
-		field *[]Struct
 		field []*Struct
 	*/
 
@@ -88,9 +86,6 @@ func getSQLType(t reflect.Type) (pt string, null bool, array bool) {
 
 		// Get the value of the pointer.
 		t = t.Elem()
-	}
-
-	switch t.Kind() {
 	case reflect.Slice:
 		array = true
 
