@@ -35,7 +35,6 @@ func main() {
 		"or":        []string{"(name.eq:alice,name.neq:bob)"},
 		"sort_by":   []string{"name.asc,age.desc"},
 	}
-	fmt.Println("query:", v)
 
 	dec, err := goql.NewDecoder[User]()
 	if err != nil {
@@ -47,13 +46,11 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println("filter:", filter)
 	var debug func(sets []goql.FieldSet, depth int)
 	debug = func(sets []goql.FieldSet, depth int) {
 		for i, set := range sets {
 			tab := strings.Repeat("\t", depth)
 			fmt.Printf("%s%d. %s %s %#v\n", tab, i+1, set.Name, set.Op, set.Value)
-			//fmt.Printf("%s%d. %+v\n%s%+v\n\n", tab, i+1, set, tab, set.Tag)
 
 			debug(set.And, depth+1)
 			debug(set.Or, depth+1)

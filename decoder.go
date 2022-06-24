@@ -14,11 +14,10 @@ const (
 var (
 	ErrMultipleOperator = errors.New("goql: multiple op")
 	ErrUnknownOperator  = errors.New("goql: unknown op")
-	ErrInvalidIs        = errors.New("goql: 'is' must be followed by {true, false, null, unknown}")
+	ErrInvalidOp        = errors.New("goql: invalid op")
 	ErrInvalidArray     = errors.New("goql: invalid array")
 	ErrUnknownField     = errors.New("goql: unknown field")
 	ErrUnknownParser    = errors.New("goql: unknown parser")
-	ErrInvalidAnd       = errors.New("goql: invalid 'and'")
 )
 
 type Filter struct {
@@ -144,7 +143,7 @@ func decodeFields(tagByField map[string]*Tag, parsers map[string]ParserFn, value
 
 		if OpsNull.Has(op) && !sqlIs(value) {
 			// OpIs/OpIsNot must have value: true, false, unknown or null.
-			return nil, fmt.Errorf("%w: %s", ErrInvalidIs, query)
+			return nil, fmt.Errorf("%w: %s", ErrInvalidOp, query)
 		}
 
 		cacheKey := fmt.Sprintf("%s:%s", field, op)
@@ -208,7 +207,7 @@ func decodeConjunction(conj Op, tagByField map[string]*Tag, parsers map[string]P
 	for _, v := range values[strings.ToLower(conj.String())] {
 		value, ok := Unquote(v, '(', ')')
 		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrInvalidAnd, conj)
+			return nil, fmt.Errorf("%w: %s", ErrInvalidOp, conj)
 		}
 
 		values := splitOutsideBrackets(value)
