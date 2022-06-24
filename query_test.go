@@ -12,6 +12,8 @@ func TestQuery(t *testing.T) {
 		"name":    []string{"eq:john", "neq:jane"},
 		"age":     []string{"gt:10", "lt:100"},
 		"married": []string{"is:true", "bad value"},
+		"and":     []string{"(age.is:true,or(age.eq:13, age.eq.17))"},
+		"or":      []string{"married.isnot:true"},
 	}
 
 	queries := goql.ParseQuery(v)

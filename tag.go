@@ -51,7 +51,7 @@ func ParseTag(tag string) (*Tag, error) {
 
 	t := Type{
 		Name:  m["null2"] + m["type"],
-		Null:  m["null1"] == "null" || m["null2"] != "",
+		Null:  m["null1"] != "" || m["null2"] != "",
 		Array: m["array"] != "",
 	}
 
@@ -110,6 +110,7 @@ func ParseStruct(unk any, key string) (map[string]*Tag, error) {
 			continue
 		}
 
+		// Infer from the tag, if any.
 		c, err := ParseTag(tag)
 		if err != nil {
 			return nil, err
@@ -119,12 +120,17 @@ func ParseStruct(unk any, key string) (map[string]*Tag, error) {
 			c.Name = lowerCommonInitialism(f.Name)
 		}
 
+		// Infer type from the tag.
 		if c.Type.Valid() {
 			tagByField[c.Name] = c
 			continue
 		}
 
+		// Infer type from the struct field.
 		c.Type = TypeOf(f.Type)
+
+		// Tags does not specify any operations - infer from the struct field's
+		// type instead.
 		if !c.Ops.Valid() {
 			c.Ops = NewOps(c.Type)
 		}

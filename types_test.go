@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/alextanhongpin/goql"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/uuid"
 )
 
 type types struct {
@@ -50,6 +52,9 @@ type types struct {
 	nipp  *net.IP
 	nipn  net.IPNet
 	nipnp *net.IPNet
+
+	uuid  uuid.UUID
+	uuidp *uuid.UUID
 }
 
 func TestTypes(t *testing.T) {
@@ -58,48 +63,44 @@ func TestTypes(t *testing.T) {
 
 	var typ types
 	tests := []struct {
-		exp         string
-		val         any
-		null, array bool
+		typ any
+		exp goql.Type
 	}{
-		{"string", typ.s, false, false},
-		{"*string", typ.sp, null, false},
-		{"sql.NullString", typ.sn, false, false},
-		{"int", typ.i, false, false},
-		{"*int", typ.ip, null, false},
-		{"sql.NullInt64", typ.in, false, false},
-		{"float64", typ.f, false, false},
-		{"*float64", typ.fp, null, false},
-		{"sql.NullFloat64", typ.fn, false, false},
-		{"bool", typ.b, false, false},
-		{"*bool", typ.bp, null, false},
-		{"sql.NullBool", typ.bn, false, false},
-		{"time.Time", typ.t, false, false},
-		{"*time.Time", typ.tp, null, false},
-		{"sql.NullTime", typ.tn, false, false},
-		{"json.RawMessage", typ.jr, false, array},
-		{"[]string", typ.js, false, array},
-		{"[]int", typ.ji, false, array},
-		{"[]float64", typ.jf, false, array},
-		{"[]bool", typ.jb, false, array},
-		{"[]time.Time", typ.jt, false, array},
-		{"net.IP", typ.nip, false, array},
-		{"*net.IP", typ.nipp, null, false},
-		{"net.IPNet", typ.nipn, false, false},
-		{"*net.IPNet", typ.nipnp, null, false},
+		{typ.s, goql.Type{"string", false, false}},
+		{typ.sp, goql.Type{"*string", null, false}},
+		{typ.sn, goql.Type{"sql.NullString", false, false}},
+		{typ.i, goql.Type{"int", false, false}},
+		{typ.ip, goql.Type{"*int", null, false}},
+		{typ.in, goql.Type{"sql.NullInt64", false, false}},
+		{typ.f, goql.Type{"float64", false, false}},
+		{typ.fp, goql.Type{"*float64", null, false}},
+		{typ.fn, goql.Type{"sql.NullFloat64", false, false}},
+		{typ.b, goql.Type{"bool", false, false}},
+		{typ.bp, goql.Type{"*bool", null, false}},
+		{typ.bn, goql.Type{"sql.NullBool", false, false}},
+		{typ.t, goql.Type{"time.Time", false, false}},
+		{typ.tp, goql.Type{"*time.Time", null, false}},
+		{typ.tn, goql.Type{"sql.NullTime", false, false}},
+		{typ.nip, goql.Type{"net.IP", false, array}},
+		{typ.nipp, goql.Type{"*net.IP", null, array}},
+		{typ.nipn, goql.Type{"net.IPNet", false, false}},
+		{typ.nipnp, goql.Type{"*net.IPNet", null, false}},
+		{typ.jr, goql.Type{"json.RawMessage", false, array}},
+		{typ.js, goql.Type{"[]string", false, array}},
+		{typ.ji, goql.Type{"[]int", false, array}},
+		{typ.jf, goql.Type{"[]float64", false, array}},
+		{typ.jb, goql.Type{"[]bool", false, array}},
+		{typ.jt, goql.Type{"[]time.Time", false, array}},
+		{typ.uuid, goql.Type{"uuid.UUID", false, array}},
+		{typ.uuidp, goql.Type{"*uuid.UUID", null, array}},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.exp, func(t *testing.T) {
-			typ := goql.TypeOf(reflect.TypeOf(tt.val))
-			if exp, got := tt.exp, typ.Name; exp != got {
-				t.Fatalf("expected %v, got %v", exp, got)
-			}
-			if exp, got := tt.null, typ.Null; exp != got {
-				t.Fatalf("expected %v, got %v", exp, got)
-			}
-			if exp, got := tt.array, typ.Array; exp != got {
-				t.Fatalf("expected %v, got %v", exp, got)
+		t.Run(tt.exp.Name, func(t *testing.T) {
+			got := goql.TypeOf(reflect.TypeOf(tt.typ))
+
+			if diff := cmp.Diff(tt.exp, got); diff != "" {
+				t.Fatalf("exp+, got-: %s", diff)
 			}
 		})
 	}

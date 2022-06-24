@@ -90,6 +90,34 @@ func split3(str, by string) (string, string, string) {
 	return a, c, d
 }
 
+func splitOutsideBrackets(val string) []string {
+	result := make([]string, 0, 8)
+	r := []rune(val)
+	var s, o, c int
+
+	for i := 0; i < len(r); i++ {
+		if r[i] == '(' {
+			o++
+		}
+		if r[i] == ')' {
+			o--
+		}
+		if r[i] == ',' {
+			if o+c != 0 {
+				continue
+			} else {
+				result = append(result, string(r[s:i]))
+				s = i + 1
+			}
+		}
+	}
+	if s != len(r) {
+		result = append(result, string(r[s:]))
+	}
+
+	return result
+}
+
 func lowerCommonInitialism(field string) string {
 	if field == "" {
 		return ""

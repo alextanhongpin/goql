@@ -32,12 +32,12 @@ func TestDecoderCustomStructTag(t *testing.T) {
 		t.FailNow()
 	}
 
-	fieldSets, err := dec.Decode(v)
+	filter, err := dec.Decode(v)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Log(fieldSets)
+	t.Log(filter)
 }
 
 func TestDecoderCustomParser(t *testing.T) {
@@ -62,16 +62,16 @@ func TestDecoderCustomParser(t *testing.T) {
 		t.FailNow()
 	}
 
-	fieldSets, err := dec.Decode(v)
+	filter, err := dec.Decode(v)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if exp, got := id, fieldSets[0].Value; exp != got {
+	if exp, got := id, filter.And[0].Value; exp != got {
 		t.Fatalf("expected %v, got %v", exp, got)
 	}
 
-	t.Log(fieldSets)
+	t.Log(filter)
 }
 
 func parseUUID(in string) (any, error) {
@@ -132,11 +132,11 @@ func TestDecoderTagOps(t *testing.T) {
 			t.FailNow()
 		}
 
-		fieldSets, err := dec.Decode(v)
+		filter, err := dec.Decode(v)
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Log(fieldSets)
+		t.Log(filter)
 	})
 
 	t.Run("invalid ops", func(t *testing.T) {
@@ -172,7 +172,7 @@ func TestDecoderNullTime(t *testing.T) {
 	})
 
 	now := time.Now()
-	fieldSets, err := dec.Decode(url.Values{
+	filter, err := dec.Decode(url.Values{
 		"marriedAt": []string{"is:null", "gt:" + now.Format(time.RFC3339)},
 	})
 	if err != nil {
@@ -180,7 +180,7 @@ func TestDecoderNullTime(t *testing.T) {
 	}
 
 	var nullTime sql.NullTime
-	if exp, got := nullTime, fieldSets[0].Value; exp != got {
+	if exp, got := nullTime, filter.And[0].Value; exp != got {
 		t.Fatalf("expected %v, got %v", exp, got)
 	}
 
@@ -193,11 +193,11 @@ func TestDecoderNullTime(t *testing.T) {
 		Time:  now,
 		Valid: true,
 	}
-	if exp, got := nonNullTime, fieldSets[1].Value; exp != got {
+	if exp, got := nonNullTime, filter.And[1].Value; exp != got {
 		t.Fatalf("expected %v, got %v", exp, got)
 	}
 
-	t.Logf("%+v", fieldSets)
+	t.Logf("%+v", filter)
 }
 
 func parseSQLNullTime(in string) (any, error) {
