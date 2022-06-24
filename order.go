@@ -6,51 +6,84 @@ import (
 	"strings"
 )
 
-var ErrInvalidDirection = errors.New("goql: invalid direction")
-
 var (
-	DirectionAscending  Direction = "asc"
-	DirectionDescending Direction = "desc"
-	DirectionNullsFirst Direction = "nullsfirst"
-	DirectionNullsLast  Direction = "nullslast"
+	ErrInvalidSortDirection = errors.New("goql: invalid sort direction")
+	ErrInvalidSortOption    = errors.New("goql: invalid sort option")
 )
 
-type Direction string
+//https://www.postgresql.org/docs/current/queries-order.html#:~:text=The%20NULLS%20FIRST%20and%20NULLS,order%2C%20and%20NULLS%20LAST%20otherwise.
 
-func (o Direction) Valid() bool {
+var (
+	SortDirectionAscending  SortDirection = "asc"
+	SortDirectionDescending SortDirection = "desc"
+	SortOptionNullsFirst    SortOption    = "nullsfirst" // Default
+	SortOptionNullsLast     SortOption    = "nullslast"  // Default
+)
+
+type SortDirection string
+
+func (o SortDirection) Valid() bool {
+	return o == SortDirectionAscending || o == SortDirectionDescending
+}
+func (o SortDirection) DefaultOption() SortOption {
 	switch o {
-	case
-		DirectionAscending,
-		DirectionDescending,
-		DirectionNullsFirst,
-		DirectionNullsLast:
-		return true
+	case SortDirectionAscending:
+		return SortOptionNullsLast
+	case SortDirectionDescending:
+		return SortOptionNullsFirst
 	default:
-		return false
+		panic("goql: invalid sort direction")
 	}
+}
+
+type SortOption string
+
+func (o SortOption) Valid() bool {
+	return o == SortOptionNullsFirst || o == SortOptionNullsLast
 }
 
 type Order struct {
-	Column    string
-	Direction Direction
+	Field     string
+	Direction SortDirection
+	Option    SortOption
 }
 
 func NewOrder(s string) (*Order, error) {
-	field, order := split2(s, ".")
-	if order == "" {
+	if s == "" {
+		return nil, nil
+	}
+
+	field, direction, option := split3(s, ".")
+	if direction == "" {
 		return &Order{
-			Column:    field,
-			Direction: DirectionAscending,
+			Field:     field,
+			Direction: SortDirectionAscending,
+			Option:    SortDirectionAscending.DefaultOption(),
 		}, nil
 	}
 
-	if o := Direction(order); !o.Valid() {
-		return nil, fmt.Errorf("%w: %q", ErrInvalidDirection, order)
+	dir := SortDirection(direction)
+	if !dir.Valid() {
+		return nil, fmt.Errorf("%w: %q", ErrInvalidSortDirection, direction)
+	}
+
+	if option == "" {
+		return &Order{
+			Field:     field,
+			Direction: dir,
+			Option:    dir.DefaultOption(),
+		}, nil
+	}
+
+	opt := SortOption(option)
+	if !opt.Valid() {
+		return nil, fmt.Errorf("%w: %q", ErrInvalidSortOption, option)
 	}
 
 	return &Order{
-		Column:    field,
-		Direction: Direction(order),
+		Field:     field,
+		Direction: dir,
+		Option:    opt,
 	}, nil
 }
 
@@ -58,15 +91,19 @@ func ParseOrder(query string) ([]Order, error) {
 	query = strings.TrimSpace(query)
 	orders := strings.Split(query, ",")
 
-	result := make([]Order, len(orders))
+	result := make([]Order, 0, len(orders))
 
-	for i, s := range orders {
+	for _, s := range orders {
+		if s == "" {
+			continue
+		}
+
 		ord, err := NewOrder(s)
 		if err != nil {
 			return nil, err
 		}
 
-		result[i] = *ord
+		result = append(result, *ord)
 	}
 
 	return result, nil

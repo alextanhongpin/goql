@@ -9,12 +9,12 @@ Since WHERE col IN (...) is pretty common in SQL, OpIn is added for most types.
 If the datatype can be NULL, then OpIs will be appended.
 */
 const (
-	OpsComparable = OpEq | OpNeq | OpLt | OpLte | OpGt | OpGte | OpIn | OpNotIn
-	OpsNull       = OpIs | OpNot
-	OpsIs         = OpIs | OpIsNot
-	OpsIn         = OpIn | OpNotIn
-	OpsText       = OpLike | OpNotLike | OpIlike | OpNotIlike | OpIn | OpNotIn | OpFts | OpPlFts | OpPhFts | OpWFts
-	OpsRange      = OpCs | OpCd | OpOv | OpSl | OpSr | OpNxr | OpNxl | OpAdj
+	OpsComparable     = OpEq | OpNeq | OpLt | OpLte | OpGt | OpGte | OpIn | OpNotIn
+	OpsNull           = OpIs | OpIsNot
+	OpsIn             = OpIn | OpNotIn
+	OpsLike           = OpLike | OpNotLike | OpIlike | OpNotIlike
+	OpsFullTextSearch = OpFts | OpPlFts | OpPhFts | OpWFts
+	OpsRange          = OpCs | OpCd | OpOv | OpSl | OpSr | OpNxr | OpNxl | OpAdj
 )
 
 type Op int
@@ -47,13 +47,10 @@ const (
 	OpNotIn                   // not in
 	OpIs                      // is, checking for exact equality (null,true,false,unknown), e.g. age=is:null
 	OpIsNot                   // is not {null, true, false, unknown}
-
-	// Full-Text search.
-	OpFts   // Full-Text search using to_tsquery
-	OpPlFts // Full-Text search using plain to tsquery
-	OpPhFts // Full-Text search using phrase to tsquery
-	OpWFts  // Full-Text search using word.
-
+	OpFts                     // Full-Text search using to_tsquery
+	OpPlFts                   // Full-Text search using plain to tsquery
+	OpPhFts                   // Full-Text search using phrase to tsquery
+	OpWFts                    // Full-Text search using word.
 	// https://www.postgresql.org/docs/14/functions-range.html
 	OpCs  // @>, contains, e.g. ?tags=cs:{example,new}
 	OpCd  // <@, contained in e.g. ?values=cd:{1,2,3}
@@ -81,12 +78,20 @@ func ParseOp(op string) (Op, bool) {
 }
 
 func sqlIs(unk string) bool {
-	switch unk {
+	switch {
 	case
-		"0", "f", "F", "n", "no", "false", "FALSE", "False",
-		"1", "t", "T", "y", "yes", "true", "TRUE", "True",
-		"null", "NULL", "Null",
-		"unknown", "UNKNOWN", "Unknown":
+		unk == "0",
+		unk == "1",
+		strings.EqualFold(unk, "f"),
+		strings.EqualFold(unk, "n"),
+		strings.EqualFold(unk, "no"),
+		strings.EqualFold(unk, "false"),
+		strings.EqualFold(unk, "t"),
+		strings.EqualFold(unk, "y"),
+		strings.EqualFold(unk, "yes"),
+		strings.EqualFold(unk, "true"),
+		strings.EqualFold(unk, "unknown"),
+		strings.EqualFold(unk, "null"):
 		return true
 	default:
 		return false

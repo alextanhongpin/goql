@@ -88,7 +88,7 @@ func NewOps(t Type) Op {
 	switch t.Name {
 	// String types have special operators.
 	case "string":
-		ops |= OpsText
+		ops |= OpsLike | OpsFullTextSearch
 	// Bool types have special operators.
 	case "bool":
 		ops |= OpsNull
@@ -106,7 +106,7 @@ func ParseStruct(unk any, key string) (map[string]*Tag, error) {
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		tag := f.Tag.Get(key)
-		if strings.HasPrefix(tag, "-") {
+		if tag == "-" {
 			continue
 		}
 
@@ -116,7 +116,7 @@ func ParseStruct(unk any, key string) (map[string]*Tag, error) {
 		}
 
 		if c.Name == "" {
-			c.Name = strings.ToLower(f.Name)
+			c.Name = lowerCommonInitialism(f.Name)
 		}
 
 		if c.Type.Valid() {

@@ -3,9 +3,52 @@ package goql
 import (
 	"encoding/csv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 var QueryDelimiter = ','
+
+var commonInitialisms = map[string]bool{
+	"ACL":   true,
+	"API":   true,
+	"ASCII": true,
+	"CPU":   true,
+	"CSS":   true,
+	"DNS":   true,
+	"EOF":   true,
+	"GUID":  true,
+	"HTML":  true,
+	"HTTP":  true,
+	"HTTPS": true,
+	"ID":    true,
+	"IP":    true,
+	"JSON":  true,
+	"LHS":   true,
+	"QPS":   true,
+	"RAM":   true,
+	"RHS":   true,
+	"RPC":   true,
+	"SLA":   true,
+	"SMTP":  true,
+	"SQL":   true,
+	"SSH":   true,
+	"TCP":   true,
+	"TLS":   true,
+	"TTL":   true,
+	"UDP":   true,
+	"UI":    true,
+	"UID":   true,
+	"UUID":  true,
+	"URI":   true,
+	"URL":   true,
+	"UTF8":  true,
+	"VM":    true,
+	"XML":   true,
+	"XMPP":  true,
+	"XSRF":  true,
+	"XSS":   true,
+}
 
 func joinStrings(ss []string) (string, error) {
 	var sb strings.Builder
@@ -38,6 +81,26 @@ func split2(str, by string) (string, string) {
 	default:
 		return "", ""
 	}
+}
+
+func split3(str, by string) (string, string, string) {
+	a, b := split2(str, by)
+	c, d := split2(b, by)
+
+	return a, c, d
+}
+
+func lowerCommonInitialism(field string) string {
+	if field == "" {
+		return ""
+	}
+
+	if commonInitialisms[field] {
+		return strings.ToLower(field)
+	}
+
+	r, i := utf8.DecodeRuneInString(field)
+	return string(unicode.ToLower(r)) + field[i:]
 }
 
 func Unquote(str string, l, r rune) (string, bool) {

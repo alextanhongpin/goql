@@ -91,70 +91,70 @@ func Decode(tagByField map[string]*Tag, parsers map[string]ParserFn, values url.
 
 	var sets []FieldSet
 
-	for field, tag := range tagByField {
-		for _, v := range values[field] {
-			opsByField, val := split2(v, ValSeparator)
+	queries := ParseQuery(values)
+	for _, query := range queries {
+		field, op, value := query.Field, query.Op, query.Value
 
-			op, ok := ParseOp(opsByField)
-			if !ok {
-				return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, v)
-			}
-
-			if !tag.Ops.Has(op) {
-				return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, v)
-			}
-
-			if OpsIs.Has(op) && !sqlIs(val) {
-				// OpIs/OpIsNot must have value: true, false, unknown or null.
-				return nil, fmt.Errorf("%w: %s", ErrInvalidIs, v)
-			}
-
-			cacheKey := fmt.Sprintf("%s:%s", field, op)
-			if cache[cacheKey] {
-				return nil, fmt.Errorf("%w: %q.%q", ErrMultipleOperator, field, strings.ToLower(op.String()))
-			}
-			cache[cacheKey] = true
-
-			parser, ok := parsers[tag.Type.Name]
-			if !ok {
-				return nil, fmt.Errorf("%w: %s", ErrUnknownParser, tag.Type.Name)
-			}
-
-			fs := FieldSet{
-				Tag:      tag,
-				Name:     field,
-				Op:       op.String(),
-				RawValue: val,
-			}
-
-			switch {
-			case OpsIn.Has(op), tag.Type.Array:
-				val, ok = Unquote(val, '{', '}')
-				if !ok {
-					return nil, fmt.Errorf("%w: missing parantheses: %s", ErrInvalidArray, val)
-				}
-
-				vals, err := splitString(val)
-				if err != nil {
-					return nil, err
-				}
-
-				res, err := Map(vals, parser)
-				if err != nil {
-					return nil, err
-				}
-
-				fs.Value = res
-			default:
-				res, err := parser(val)
-				if err != nil {
-					return nil, err
-				}
-				fs.Value = res
-			}
-
-			sets = append(sets, fs)
+		tag, ok := tagByField[field]
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrUnknownField, field)
 		}
+
+		hasOp := tag.Ops.Has(op)
+		if !hasOp {
+			return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, query)
+		}
+
+		if OpsNull.Has(op) && !sqlIs(value) {
+			// OpIs/OpIsNot must have value: true, false, unknown or null.
+			return nil, fmt.Errorf("%w: %s", ErrInvalidIs, query)
+		}
+
+		cacheKey := fmt.Sprintf("%s:%s", field, op)
+		if cache[cacheKey] {
+			return nil, fmt.Errorf("%w: %q.%q", ErrMultipleOperator, field, strings.ToLower(op.String()))
+		}
+		cache[cacheKey] = true
+
+		parser, ok := parsers[tag.Type.Name]
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrUnknownParser, tag.Type.Name)
+		}
+
+		fs := FieldSet{
+			Tag:      tag,
+			Name:     field,
+			Op:       op.String(),
+			RawValue: value,
+		}
+
+		switch {
+		case OpsIn.Has(op), tag.Type.Array:
+			value, ok = Unquote(value, '{', '}')
+			if !ok {
+				return nil, fmt.Errorf("%w: missing parantheses: %s", ErrInvalidArray, value)
+			}
+
+			vals, err := splitString(value)
+			if err != nil {
+				return nil, err
+			}
+
+			res, err := Map(vals, parser)
+			if err != nil {
+				return nil, err
+			}
+
+			fs.Value = res
+		default:
+			res, err := parser(value)
+			if err != nil {
+				return nil, err
+			}
+			fs.Value = res
+		}
+
+		sets = append(sets, fs)
 	}
 
 	return sets, nil
