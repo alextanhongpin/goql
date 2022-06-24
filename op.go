@@ -9,10 +9,11 @@ Since WHERE col IN (...) is pretty common in SQL, OpIn is added for most types.
 If the datatype can be NULL, then OpIs will be appended.
 */
 const (
-	OpsComparable = OpEq | OpNeq | OpLt | OpLte | OpGt | OpGte | OpIn
+	OpsComparable = OpEq | OpNeq | OpLt | OpLte | OpGt | OpGte | OpIn | OpNotIn
 	OpsNull       = OpIs | OpNot
-	OpsNot        = OpLike | OpIlike | OpIn
-	OpsText       = OpsComparable | OpLike | OpIlike | OpIn | OpFts | OpPlFts | OpPhFts | OpWFts
+	OpsIs         = OpIs | OpIsNot
+	OpsIn         = OpIn | OpNotIn
+	OpsText       = OpsComparable | OpLike | OpNotLike | OpIlike | OpNotIlike | OpIn | OpNotIn | OpFts | OpPlFts | OpPhFts | OpWFts
 	OpsRange      = OpCs | OpCd | OpOv | OpSl | OpSr | OpNxr | OpNxl | OpAdj
 )
 
@@ -28,16 +29,20 @@ func (o Op) Is(tgt Op) bool {
 
 //go:generate stringer -type Op -trimprefix Op
 const (
-	OpEq    Op = 1 << iota // =, equals, e.g. name=eq:john becomes name = 'john'
-	OpNeq                  // <> or !=, not equals, e.g. name=neq:john becomes name <> 'john'
-	OpLt                   // <, less than
-	OpLte                  // <=, less than equals
-	OpGt                   // >, greater than
-	OpGte                  // >=, greater than equals
-	OpLike                 // like, e.g. like:john* becomes name like 'john%' (use * instead of % in query string)
-	OpIlike                // ilike, same as like, but case insensitive, e.g. name=ilike:john%
-	OpIn                   // in, e.g. name=in:{1,2,3| becomes name in (1,2,3). The curly brackets is needed to indicate that the whole value is an array, since for array columns there's no way to differentiate for a single value.
-	OpIs                   // is, checking for exact equality (null,true,false,unknown), e.g. age=is:null
+	OpEq       Op = 1 << iota // =, equals, e.g. name=eq:john becomes name = 'john'
+	OpNeq                     // <> or !=, not equals, e.g. name=neq:john becomes name <> 'john'
+	OpLt                      // <, less than
+	OpLte                     // <=, less than equals
+	OpGt                      // >, greater than
+	OpGte                     // >=, greater than equals
+	OpLike                    // like, e.g. like:john* becomes name like 'john%' (use * instead of % in query string)
+	OpIlike                   // ilike, same as like, but case insensitive, e.g. name=ilike:john%
+	OpNotLike                 // not like
+	OpNotIlike                // not ilike
+	OpIn                      // in, e.g. name=in:{1,2,3| becomes name in (1,2,3). The curly brackets is needed to indicate that the whole value is an array, since for array columns there's no way to differentiate for a single value.
+	OpNotIn                   // not in
+	OpIs                      // is, checking for exact equality (null,true,false,unknown), e.g. age=is:null
+	OpIsNot                   // is not {null, true, false, unknown}
 
 	// Full-Text search.
 	OpFts   // Full-Text search using to_tsquery
@@ -69,18 +74,6 @@ func ParseOp(op string) (Op, bool) {
 	}
 
 	return 0, false
-}
-
-// IsOpChainable returns if an operator can be chained.
-func IsOpChainable(op1, op2 Op) bool {
-	switch op1 {
-	case OpIs:
-		return op2 == OpNot
-	case OpNot:
-		return OpsNot.Has(op2)
-	default:
-		return false
-	}
 }
 
 func sqlIs(unk string) bool {

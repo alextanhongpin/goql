@@ -29,7 +29,6 @@ type FieldSet struct {
 	Value    any
 	RawValue string
 	SQLType  string
-	Not      bool
 	IsNull   bool
 	IsArray  bool
 	Format   string
@@ -85,7 +84,7 @@ func (d *Decoder[T]) SetStructTag(tag string) {
 
 	var t T
 	d.tag = tag
-	d.columns = StructToColumns(t, StructTag)
+	d.columns = StructToColumns(t, tag)
 }
 
 func (d *Decoder[T]) SetFieldOps(opsByField map[string]Op) {
@@ -114,59 +113,21 @@ func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]par
 		for _, v := range values[field] {
 			ops, val := split2(v, ValSeparator)
 
-			var op Op
-			var ok bool
-			var not bool
-
-			// ops can be chained, e.g. is.not:true, not.in:{1,2,3}
-			subops := strings.Split(ops, OpSeparator)
-			switch len(subops) {
-			case 1:
-				op, ok = ParseOp(subops[0])
-				if !ok {
-					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, v)
-				}
-			case 2:
-				// Allow chaining of rule with not or is, e.g.
-				// is.not:true, is:not:unknown
-				// not.eq:john, not.in:{1,2,3}
-				op1, ok := ParseOp(subops[0])
-				if !ok {
-					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, v)
-				}
-
-				op2, ok := ParseOp(subops[1])
-				if !ok {
-					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, v)
-				}
-
-				if !IsOpChainable(op1, op2) {
-					return nil, fmt.Errorf("%w: %s", ErrBadOperator, v)
-				}
-
-				not = true
-
-				switch op1 {
-				case OpIs:
-					op = op1
-					// OpIs must have value: true, false, unknown or null.
-					if !sqlIs(val) {
-						return nil, fmt.Errorf("%w: %s", ErrInvalidIs, v)
-					}
-				case OpNot:
-					op = op2
-				default:
-					return nil, fmt.Errorf("%w: %s", ErrBadOperator, v)
-				}
-			default:
-				return nil, fmt.Errorf("%w: %s", ErrBadOperator, v)
+			op, ok := ParseOp(ops)
+			if !ok {
+				return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, v)
 			}
 
 			if !rule.Has(op) {
 				return nil, fmt.Errorf("%w: %s", ErrBadOperator, v)
 			}
 
-			cacheKey := fmt.Sprintf("%s:%s:%t", field, op, not)
+			if OpsIs.Has(op) && !sqlIs(val) {
+				// OpIs/OpIsNot must have value: true, false, unknown or null.
+				return nil, fmt.Errorf("%w: %s", ErrInvalidIs, v)
+			}
+
+			cacheKey := fmt.Sprintf("%s:%s", field, op)
 			if cache[cacheKey] {
 				return nil, fmt.Errorf("%w: %q.%q", ErrMultipleOperator, field, strings.ToLower(op.String()))
 			}
@@ -182,7 +143,6 @@ func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]par
 				SQLType:  col.SQLType,
 				IsNull:   col.IsNull,
 				IsArray:  col.IsArray,
-				Not:      not,
 				Format:   col.Format,
 				Tag:      col.Tag,
 				Op:       op.String(),
@@ -195,7 +155,7 @@ func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]par
 			}
 
 			switch {
-			case op.Is(OpIn), col.IsArray:
+			case OpsIn.Has(op), col.IsArray:
 				val, ok = Unquote(val, '{', '}')
 				if !ok {
 					return nil, fmt.Errorf("%w: missing parantheses: %s", ErrInvalidArray, val)
