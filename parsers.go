@@ -6,42 +6,28 @@ import (
 	"time"
 )
 
-func newByte(in string) (b []byte) {
-	switch in {
-	case
-		"null",
-		"true",
-		"false":
-		b = []byte(in)
-	default:
-		b = strconv.AppendQuote(nil, in)
-	}
-
-	return
-}
-
 type ParserFn func(s string) (any, error)
 
 func NewParsers() map[string]ParserFn {
 	return map[string]ParserFn{
 		"time.Time":  ParseTime,
-		"*time.Time": ParsePointer[time.Time],
+		"*time.Time": ParseStringPointer[time.Time],
 		"bool":       ParseBool,
-		"*bool":      ParsePointer[bool],
+		"*bool":      ParseStringPointer[bool],
 		"float32":    ParseFloat32,
-		"*float32":   ParsePointer[float32],
+		"*float32":   ParseNumericPointer[float32],
 		"float64":    ParseFloat64,
-		"*float64":   ParsePointer[float64],
+		"*float64":   ParseNumericPointer[float64],
 		"int16":      ParseInt16,
-		"*int16":     ParsePointer[int16],
+		"*int16":     ParseNumericPointer[int16],
 		"int32":      ParseInt32,
-		"*int32":     ParsePointer[int32],
+		"*int32":     ParseNumericPointer[int32],
 		"int64":      ParseInt64,
-		"*int64":     ParsePointer[int64],
+		"*int64":     ParseNumericPointer[int64],
 		"int":        ParseInt64,
-		"*int":       ParsePointer[int],
+		"*int":       ParseNumericPointer[int],
 		"string":     ParseString,
-		"*string":    ParsePointer[string],
+		"*string":    ParseStringPointer[string],
 		"":           ParseNop,
 	}
 }
@@ -95,11 +81,29 @@ func ParseString(in string) (any, error) {
 	return in, nil
 }
 
-func ParsePointer[T any](in string) (any, error) {
-	b := newByte(in)
+func ParseStringPointer[T string | bool | time.Time](in string) (any, error) {
+	var b []byte
+	switch in {
+	case
+		"null",
+		"true",
+		"false":
+		b = []byte(in)
+	default:
+		b = strconv.AppendQuote(nil, in)
+	}
 
 	var t *T
 	if err := json.Unmarshal(b, &t); err != nil {
+		return nil, err
+	}
+
+	return t, nil
+}
+
+func ParseNumericPointer[T int | int16 | int32 | int64 | float32 | float64](in string) (any, error) {
+	var t *T
+	if err := json.Unmarshal([]byte(in), &t); err != nil {
 		return nil, err
 	}
 

@@ -15,7 +15,7 @@ const (
 var (
 	ErrMultipleOperator = errors.New("goql: multiple op")
 	ErrUnknownOperator  = errors.New("goql: unknown op")
-	ErrInvalidIs        = errors.New("goql: 'IS' must be followed by {true, false, null, unknown}")
+	ErrInvalidIs        = errors.New("goql: 'is' must be followed by {true, false, null, unknown}")
 	ErrInvalidArray     = errors.New("goql: invalid array")
 	ErrUnknownField     = errors.New("goql: unknown field")
 	ErrUnknownParser    = errors.New("goql: unknown parser")
@@ -70,6 +70,16 @@ func (d *Decoder[T]) SetStructTag(tag string) error {
 
 func (d *Decoder[T]) SetParsers(parserByType map[string]ParserFn) {
 	d.parsers = parserByType
+}
+
+func (d *Decoder[T]) SetOps(field string, ops Op) error {
+	if _, ok := d.tagByField[field]; !ok {
+		return fmt.Errorf("%w: %s", ErrUnknownField, field)
+	}
+
+	d.tagByField[field].Ops = ops
+
+	return nil
 }
 
 func (d *Decoder[T]) Decode(values url.Values) ([]FieldSet, error) {

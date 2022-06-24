@@ -19,6 +19,10 @@ const (
 
 type Op int
 
+func (o Op) Valid() bool {
+	return o != 0
+}
+
 func (o Op) Has(tgt Op) bool {
 	return o&tgt == tgt
 }

@@ -55,7 +55,7 @@ func ParseTag(tag string) (*Tag, error) {
 		Array: m["array"] != "",
 	}
 
-	if ops == 0 {
+	if !ops.Valid() {
 		ops = NewOps(t)
 	}
 
@@ -68,7 +68,7 @@ func ParseTag(tag string) (*Tag, error) {
 }
 
 func NewOps(t Type) Op {
-	if t.Name == "" {
+	if !t.Valid() {
 		return 0
 	}
 
@@ -119,15 +119,16 @@ func ParseStruct(unk any, key string) (map[string]*Tag, error) {
 			c.Name = strings.ToLower(f.Name)
 		}
 
-		if c.Type.Name != "" {
+		if c.Type.Valid() {
 			tagByField[c.Name] = c
 			continue
 		}
 
 		c.Type = TypeOf(f.Type)
-		if c.Ops == 0 {
+		if !c.Ops.Valid() {
 			c.Ops = NewOps(c.Type)
 		}
+
 		tagByField[c.Name] = c
 	}
 

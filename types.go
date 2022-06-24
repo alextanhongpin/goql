@@ -10,6 +10,10 @@ type Type struct {
 	Null  bool
 }
 
+func (t *Type) Valid() bool {
+	return t.Name != ""
+}
+
 func TypeOf(t reflect.Type) Type {
 	res := Type{
 		Name: t.String(),

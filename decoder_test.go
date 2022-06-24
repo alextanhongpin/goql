@@ -14,7 +14,7 @@ import (
 func TestDecoderCustomStructTag(t *testing.T) {
 	type User struct {
 		Name    string `sql:"name"`
-		Age     int    `sql:"age"`
+		Age     *int   `sql:"age"`
 		Married bool
 	}
 
@@ -76,6 +76,44 @@ func TestDecoderCustomParser(t *testing.T) {
 
 func parseUUID(in string) (any, error) {
 	return uuid.Parse(in)
+}
+
+func TestDecoderSetOps(t *testing.T) {
+	type User struct {
+		Name string `q:"name,ops:eq"`
+	}
+
+	dec, err := goql.NewDecoder[User]()
+	if err != nil {
+		t.Fatalf("error constructing new decoder: %v", err)
+	}
+	if err := dec.SetOps("name", goql.OpNeq); err != nil {
+		t.Fatalf("error setting ops: %v", err)
+	}
+
+	t.Run("valid ops", func(t *testing.T) {
+		v, err := url.ParseQuery(`name=eq:hello`)
+		if err != nil {
+			t.FailNow()
+		}
+
+		_, err = dec.Decode(v)
+		if exp, got := goql.ErrUnknownOperator, err; !errors.Is(err, exp) {
+			t.Fatalf("expected %v, got %v", exp, got)
+		}
+	})
+
+	t.Run("invalid ops", func(t *testing.T) {
+		v, err := url.ParseQuery(`name=neq:hello`)
+		if err != nil {
+			t.FailNow()
+		}
+
+		_, err = dec.Decode(v)
+		if err != nil {
+			t.Fatalf("expected nil, got %v", err)
+		}
+	})
 }
 
 func TestDecoderTagOps(t *testing.T) {
@@ -163,7 +201,7 @@ func TestDecoderNullTime(t *testing.T) {
 }
 
 func parseSQLNullTime(in string) (any, error) {
-	t, err := goql.ParsePointer[time.Time](in)
+	t, err := goql.ParseStringPointer[time.Time](in)
 	if err != nil {
 		return nil, err
 	}
