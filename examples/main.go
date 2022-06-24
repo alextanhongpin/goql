@@ -28,7 +28,7 @@ func main() {
 	}
 	fmt.Println("query:", v)
 
-	dec := goql.NewDecoder(&User{})
+	dec := goql.NewDecoder[User]()
 	sets, err := dec.Decode(v)
 	if err != nil {
 		panic(err)

@@ -9,30 +9,30 @@ type parserFn func(s string, format ...string) (any, error)
 
 func NewParsers() map[string]parserFn {
 	return map[string]parserFn{
-		pgTypeTimestamp:       parseTime,
-		pgTypeTimestampTz:     parseTime,
-		pgTypeDate:            parseTime,
-		pgTypeTime:            parseTime,
-		pgTypeTimeTz:          parseTime,
-		pgTypeInterval:        parseNop,
-		pgTypeInet:            parseNop,
-		pgTypeCidr:            parseNop,
-		pgTypeMacaddr:         parseNop,
-		pgTypeBoolean:         parseBool,
-		pgTypeReal:            parseFloat32,
-		pgTypeDoublePrecision: parseFloat64,
-		pgTypeSmallint:        parseInt16,
-		pgTypeInteger:         parseInt32,
-		pgTypeBigint:          parseInt64,
-		pgTypeSmallserial:     parseNop,
-		pgTypeSerial:          parseNop,
-		pgTypeBigserial:       parseNop,
-		pgTypeVarchar:         parseText,
-		pgTypeChar:            parseText,
-		pgTypeText:            parseText,
-		pgTypeJSON:            parseText,
-		pgTypeJSONB:           parseText,
-		pgTypeBytea:           parseText,
+		pgTypeTimestamp:       ParseTime,
+		pgTypeTimestampTz:     ParseTime,
+		pgTypeDate:            ParseTime,
+		pgTypeTime:            ParseTime,
+		pgTypeTimeTz:          ParseTime,
+		pgTypeInterval:        ParseNop,
+		pgTypeInet:            ParseNop,
+		pgTypeCidr:            ParseNop,
+		pgTypeMacaddr:         ParseNop,
+		pgTypeBoolean:         ParseBool,
+		pgTypeReal:            ParseFloat32,
+		pgTypeDoublePrecision: ParseFloat64,
+		pgTypeSmallint:        ParseInt16,
+		pgTypeInteger:         ParseInt32,
+		pgTypeBigint:          ParseInt64,
+		pgTypeSmallserial:     ParseNop,
+		pgTypeSerial:          ParseNop,
+		pgTypeBigserial:       ParseNop,
+		pgTypeVarchar:         ParseText,
+		pgTypeChar:            ParseText,
+		pgTypeText:            ParseText,
+		pgTypeJSON:            ParseText,
+		pgTypeJSONB:           ParseText,
+		pgTypeBytea:           ParseText,
 	}
 }
 
@@ -49,7 +49,7 @@ func MapAny[T any](in []string, format []string, fn func(string, ...string) (T, 
 	return res, nil
 }
 
-func parseTime(in string, format ...string) (any, error) {
+func ParseTime(in string, format ...string) (any, error) {
 	if len(format) == 1 {
 		return time.Parse(format[0], in)
 	} else {
@@ -57,53 +57,53 @@ func parseTime(in string, format ...string) (any, error) {
 	}
 }
 
-func parseNop(in string, format ...string) (any, error) {
+func ParseNop(in string, format ...string) (any, error) {
 	panic("goql: parser not implemented")
 }
 
-func parseBool(in string, format ...string) (any, error) {
+func ParseBool(in string, format ...string) (any, error) {
 	if len(format) > 0 {
 		panic("goql: invalid args")
 	}
 	return strconv.ParseBool(in)
 }
 
-func parseFloat32(in string, format ...string) (any, error) {
+func ParseFloat32(in string, format ...string) (any, error) {
 	if len(format) > 0 {
 		panic("goql: invalid args")
 	}
 	return strconv.ParseFloat(in, 32)
 }
 
-func parseFloat64(in string, format ...string) (any, error) {
+func ParseFloat64(in string, format ...string) (any, error) {
 	if len(format) > 0 {
 		panic("goql: invalid args")
 	}
 	return strconv.ParseFloat(in, 64)
 }
 
-func parseInt16(in string, format ...string) (any, error) {
+func ParseInt16(in string, format ...string) (any, error) {
 	if len(format) > 0 {
 		panic("goql: invalid args")
 	}
 	return strconv.ParseInt(in, 10, 16)
 }
 
-func parseInt32(in string, format ...string) (any, error) {
+func ParseInt32(in string, format ...string) (any, error) {
 	if len(format) > 0 {
 		panic("goql: invalid args")
 	}
 	return strconv.ParseInt(in, 10, 32)
 }
 
-func parseInt64(in string, format ...string) (any, error) {
+func ParseInt64(in string, format ...string) (any, error) {
 	if len(format) > 0 {
 		panic("goql: invalid args")
 	}
 	return strconv.ParseInt(in, 10, 64)
 }
 
-func parseText(in string, format ...string) (any, error) {
+func ParseText(in string, format ...string) (any, error) {
 	if len(format) > 0 {
 		panic("goql: invalid args")
 	}

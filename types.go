@@ -85,39 +85,32 @@ func sqlType(t reflect.Type) string {
 	}
 }
 
-func GetSQLType(t reflect.Type) (pt string, null bool, array bool) {
+func GetSQLType(t reflect.Type) (typ string, null, array bool) {
 	/*
 		Handles only the following
 		field *Struct
 		field Struct
 		field []*Struct
 	*/
+	typ = sqlType(t)
+	null = sqlNullType(t)
 
-	// Unwraps all pointer first, could be slice or base type.
-	switch t.Kind() {
-	case reflect.Pointer:
+	switch typ {
+	case "ptr":
 		null = true
 
 		// Get the value of the pointer.
 		t = t.Elem()
-	case reflect.Slice:
-		array = true
 
-		// Get the item of the slice.
+		typ = sqlType(t)
+	case "jsonb":
 		t = t.Elem()
-
-		// Check the item if it is a pointer.
 		switch t.Kind() {
-		case reflect.Pointer:
-			null = true
-
-			t = t.Elem()
+		case reflect.Uint8:
+		default:
+			array = true
+			typ = sqlType(t)
 		}
-	}
-
-	pt = sqlType(t)
-	if !null {
-		null = sqlNullType(t)
 	}
 
 	return

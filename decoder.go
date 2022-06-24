@@ -37,17 +37,19 @@ type FieldSet struct {
 	Op       string
 }
 
-type Decoder struct {
+type Decoder[T any] struct {
 	ops     map[string]Op
 	columns map[string]Column
 	parsers map[string]parserFn
 	tag     string
 }
 
-func NewDecoder(v any) *Decoder {
+func NewDecoder[T any]() *Decoder[T] {
+	var t T
+
 	parsers := NewParsers()
 	opsByField := make(map[string]Op)
-	columns := StructToColumns(v, StructTag)
+	columns := StructToColumns(t, StructTag)
 
 	for name, col := range columns {
 		// By default, all datatypes are comparable.
@@ -68,7 +70,7 @@ func NewDecoder(v any) *Decoder {
 		opsByField[name] = ops
 	}
 
-	return &Decoder{
+	return &Decoder[T]{
 		columns: columns,
 		ops:     opsByField,
 		tag:     StructTag,
@@ -76,23 +78,25 @@ func NewDecoder(v any) *Decoder {
 	}
 }
 
-func (d *Decoder) SetStructTag(tag string) {
+func (d *Decoder[T]) SetStructTag(tag string) {
 	if tag == "" {
 		panic("tag cannot be empty")
 	}
 
+	var t T
 	d.tag = tag
+	d.columns = StructToColumns(t, StructTag)
 }
 
-func (d *Decoder) SetFieldOps(opsByField map[string]Op) {
+func (d *Decoder[T]) SetFieldOps(opsByField map[string]Op) {
 	d.ops = opsByField
 }
 
-func (d *Decoder) SetParsers(parsers map[string]parserFn) {
+func (d *Decoder[T]) SetParsers(parsers map[string]parserFn) {
 	d.parsers = parsers
 }
 
-func (d *Decoder) Decode(values url.Values) ([]FieldSet, error) {
+func (d *Decoder[T]) Decode(values url.Values) ([]FieldSet, error) {
 	return Decode(d.ops, d.columns, d.parsers, values)
 }
 
