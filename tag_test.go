@@ -27,20 +27,12 @@ func TestTag(t *testing.T) {
 			},
 		},
 		{
-			name: "field null",
+			name: "field",
 			tag:  "age,null",
 			exp: goql.Column{
 				Name:   "age",
 				IsNull: true,
 				Tag:    "age,null",
-			},
-		},
-		{
-			name: "field notnull",
-			tag:  "age,notnull",
-			exp: goql.Column{
-				Name: "age",
-				Tag:  "age,notnull",
 			},
 		},
 		{
@@ -62,12 +54,12 @@ func TestTag(t *testing.T) {
 		},
 		{
 			name: "field type array",
-			tag:  "id,type:uuid[]",
+			tag:  "id,type:[]uuid",
 			exp: goql.Column{
 				Name:    "id",
 				SQLType: "uuid",
 				IsArray: true,
-				Tag:     "id,type:uuid[]",
+				Tag:     "id,type:[]uuid",
 			},
 		},
 		{
@@ -82,13 +74,24 @@ func TestTag(t *testing.T) {
 		},
 		{
 			name: "field type format array",
-			tag:  "birthday,type:date[],format:20060102",
+			tag:  "birthday,type:[]date,format:20060102",
 			exp: goql.Column{
 				Format:  "20060102",
 				Name:    "birthday",
 				IsArray: true,
 				SQLType: "date",
-				Tag:     "birthday,type:date[],format:20060102",
+				Tag:     "birthday,type:[]date,format:20060102",
+			},
+		},
+		{
+			name: "field type null alternative",
+			tag:  "birthday,type:date?,format:20060102",
+			exp: goql.Column{
+				Format:  "20060102",
+				Name:    "birthday",
+				IsNull:  true,
+				SQLType: "date",
+				Tag:     "birthday,type:date?,format:20060102",
 			},
 		},
 	}
