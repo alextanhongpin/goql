@@ -1,9 +1,11 @@
 package goql_test
 
 import (
+	"database/sql"
 	"errors"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/alextanhongpin/goql"
 	"github.com/google/uuid"
@@ -114,4 +116,66 @@ func TestDecoderTagOps(t *testing.T) {
 			t.Fatalf("expected %v, got %v", exp, err)
 		}
 	})
+}
+
+func TestDecoderNullTime(t *testing.T) {
+	type User struct {
+		MarriedAt sql.NullTime `q:"marriedAt,ops:is,gt"`
+	}
+
+	dec, err := goql.NewDecoder[User]()
+	if err != nil {
+		t.Fatalf("error constructing new decoder: %v", err)
+	}
+
+	dec.SetParsers(map[string]goql.ParserFn{
+		// Register type
+		"sql.NullTime": parseSQLNullTime,
+	})
+
+	now := time.Now()
+	fieldSets, err := dec.Decode(url.Values{
+		"marriedAt": []string{"is:null", "gt:" + now.Format(time.RFC3339)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var nullTime sql.NullTime
+	if exp, got := nullTime, fieldSets[0].Value; exp != got {
+		t.Fatalf("expected %v, got %v", exp, got)
+	}
+
+	now, err = time.Parse(time.RFC3339, now.Format(time.RFC3339))
+	if err != nil {
+		t.FailNow()
+	}
+
+	nonNullTime := sql.NullTime{
+		Time:  now,
+		Valid: true,
+	}
+	if exp, got := nonNullTime, fieldSets[1].Value; exp != got {
+		t.Fatalf("expected %v, got %v", exp, got)
+	}
+
+	t.Logf("%+v", fieldSets)
+}
+
+func parseSQLNullTime(in string) (any, error) {
+	t, err := goql.ParsePointer[time.Time](in)
+	if err != nil {
+		return nil, err
+	}
+
+	if t == nil {
+		return sql.NullTime{Time: time.Time{}, Valid: false}, nil
+	}
+
+	tm, ok := t.(*time.Time)
+	if !ok || tm == nil {
+		return sql.NullTime{Time: time.Time{}, Valid: false}, nil
+	}
+
+	return sql.NullTime{Time: *tm, Valid: true}, nil
 }

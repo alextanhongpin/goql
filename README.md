@@ -13,3 +13,7 @@ Parse query string with rules.
 
 Reference:
 - https://postgrest.org/en/stable/api.html
+
+TODO
+- add ops all
+- all customizing field ops
