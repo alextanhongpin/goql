@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-type parserFn func(s string, format ...string) (any, error)
+type ParserFn func(s string, format ...string) (any, error)
 
-func NewParsers() map[string]parserFn {
-	return map[string]parserFn{
+func NewParsers() map[string]ParserFn {
+	return map[string]ParserFn{
 		pgTypeTimestamp:       ParseTime,
 		pgTypeTimestampTz:     ParseTime,
 		pgTypeDate:            ParseTime,

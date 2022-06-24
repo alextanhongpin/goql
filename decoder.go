@@ -39,7 +39,7 @@ type FieldSet struct {
 type Decoder[T any] struct {
 	ops     map[string]Op
 	columns map[string]Column
-	parsers map[string]parserFn
+	parsers map[string]ParserFn
 	tag     string
 }
 
@@ -91,7 +91,7 @@ func (d *Decoder[T]) SetFieldOps(opsByField map[string]Op) {
 	d.ops = opsByField
 }
 
-func (d *Decoder[T]) SetParsers(parsers map[string]parserFn) {
+func (d *Decoder[T]) SetParsers(parsers map[string]ParserFn) {
 	d.parsers = parsers
 }
 
@@ -99,7 +99,7 @@ func (d *Decoder[T]) Decode(values url.Values) ([]FieldSet, error) {
 	return Decode(d.ops, d.columns, d.parsers, values)
 }
 
-func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]parserFn, values url.Values) ([]FieldSet, error) {
+func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]ParserFn, values url.Values) ([]FieldSet, error) {
 	cache := make(map[string]bool)
 
 	var sets []FieldSet
