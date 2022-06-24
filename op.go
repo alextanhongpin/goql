@@ -13,7 +13,7 @@ const (
 	OpsNull       = OpIs | OpNot
 	OpsIs         = OpIs | OpIsNot
 	OpsIn         = OpIn | OpNotIn
-	OpsText       = OpsComparable | OpLike | OpNotLike | OpIlike | OpNotIlike | OpIn | OpNotIn | OpFts | OpPlFts | OpPhFts | OpWFts
+	OpsText       = OpLike | OpNotLike | OpIlike | OpNotIlike | OpIn | OpNotIn | OpFts | OpPlFts | OpPhFts | OpWFts
 	OpsRange      = OpCs | OpCd | OpOv | OpSl | OpSr | OpNxr | OpNxl | OpAdj
 )
 
