@@ -4,20 +4,19 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
 )
 
 const (
-	StructTag    = "sql"
+	StructTag    = "q"
 	ValSeparator = ":"
-	OpSeparator  = "."
 )
 
 var (
 	ErrMultipleOperator = errors.New("goql: multiple op")
 	ErrUnknownOperator  = errors.New("goql: unknown op")
 	ErrBadOperator      = errors.New("goql: bad op")
-	ErrInvalidNot       = errors.New("goql: invalid not")
 	ErrInvalidIs        = errors.New("goql: 'IS' must be followed by {true, false, null, unknown}")
 	ErrInvalidArray     = errors.New("goql: invalid array")
 	ErrUnknownField     = errors.New("goql: unknown field")
@@ -25,55 +24,56 @@ var (
 )
 
 type FieldSet struct {
+	Tag      Tag
 	Name     string
 	Value    any
 	RawValue string
-	SQLType  string
-	IsNull   bool
-	IsArray  bool
-	Format   string
-	Tag      string
 	Op       string
 }
 
 type Decoder[T any] struct {
-	ops     map[string]Op
-	columns map[string]Column
-	parsers map[string]ParserFn
-	tag     string
+	opsByField map[string]Op
+	tagByField map[string]Tag
+	parsers    map[string]ParserFn
+	tag        string
 }
 
 func NewDecoder[T any]() *Decoder[T] {
 	var t T
 
-	parsers := NewParsers()
+	parserByType := NewParsers()
 	opsByField := make(map[string]Op)
-	columns := StructToColumns(t, StructTag)
+	tagByField := ParseStruct(t, StructTag)
 
-	for name, col := range columns {
-		// By default, all datatypes are comparable.
+	for field, tag := range tagByField {
+		t := tag.Type
+
+		// All types are comparable.
 		ops := OpsComparable
 
-		if col.IsNull {
+		// Null type have special operators.
+		if t.Null {
 			ops |= OpsNull
 		}
 
-		if col.IsArray {
+		// Array type have special operators.
+		if t.Array {
 			ops |= OpsRange
 		}
 
-		if IsPgText(col.SQLType) {
+		// String types have special operators.
+		if t.Name == reflect.String.String() {
 			ops |= OpsText
 		}
 
-		opsByField[name] = ops
+		opsByField[field] = ops
 	}
 
 	return &Decoder[T]{
-		columns: columns,
-		ops:     opsByField,
-		tag:     StructTag,
-		parsers: parsers,
+		tagByField: tagByField,
+		opsByField: opsByField,
+		tag:        StructTag,
+		parsers:    parserByType,
 	}
 }
 
@@ -84,36 +84,36 @@ func (d *Decoder[T]) SetStructTag(tag string) {
 
 	var t T
 	d.tag = tag
-	d.columns = StructToColumns(t, tag)
+	d.tagByField = ParseStruct(t, tag)
 }
 
 func (d *Decoder[T]) SetFieldOps(opsByField map[string]Op) {
-	d.ops = opsByField
+	d.opsByField = opsByField
 }
 
-func (d *Decoder[T]) SetParsers(parsers map[string]ParserFn) {
-	d.parsers = parsers
+func (d *Decoder[T]) SetParsers(parserByType map[string]ParserFn) {
+	d.parsers = parserByType
 }
 
 func (d *Decoder[T]) Decode(values url.Values) ([]FieldSet, error) {
-	return Decode(d.ops, d.columns, d.parsers, values)
+	return Decode(d.opsByField, d.tagByField, d.parsers, values)
 }
 
-func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]ParserFn, values url.Values) ([]FieldSet, error) {
+func Decode(opsByField map[string]Op, tagByField map[string]Tag, parsers map[string]ParserFn, values url.Values) ([]FieldSet, error) {
 	cache := make(map[string]bool)
 
 	var sets []FieldSet
 
-	for field, rule := range ops {
-		col, ok := columns[field]
+	for field, rule := range opsByField {
+		tag, ok := tagByField[field]
 		if !ok {
 			return nil, fmt.Errorf("%w: %s", ErrUnknownField, field)
 		}
 
 		for _, v := range values[field] {
-			ops, val := split2(v, ValSeparator)
+			opsByField, val := split2(v, ValSeparator)
 
-			op, ok := ParseOp(ops)
+			op, ok := ParseOp(opsByField)
 			if !ok {
 				return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, v)
 			}
@@ -133,29 +133,20 @@ func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]Par
 			}
 			cache[cacheKey] = true
 
-			parser, ok := parsers[col.SQLType]
+			parser, ok := parsers[tag.Type.Name]
 			if !ok {
-				return nil, fmt.Errorf("%w: %s", ErrUnknownParser, col.SQLType)
+				return nil, fmt.Errorf("%w: %s", ErrUnknownParser, tag.Type.Name)
 			}
 
 			fs := FieldSet{
+				Tag:      tag,
 				Name:     field,
-				SQLType:  col.SQLType,
-				IsNull:   col.IsNull,
-				IsArray:  col.IsArray,
-				Format:   col.Format,
-				Tag:      col.Tag,
 				Op:       op.String(),
 				RawValue: val,
 			}
 
-			var format []string
-			if col.Format != "" {
-				format = append(format, col.Format)
-			}
-
 			switch {
-			case OpsIn.Has(op), col.IsArray:
+			case OpsIn.Has(op), tag.Type.Array:
 				val, ok = Unquote(val, '{', '}')
 				if !ok {
 					return nil, fmt.Errorf("%w: missing parantheses: %s", ErrInvalidArray, val)
@@ -166,22 +157,18 @@ func Decode(ops map[string]Op, columns map[string]Column, parsers map[string]Par
 					return nil, err
 				}
 
-				res, err := MapAny(vals, format, parser)
+				res, err := Map(vals, parser)
 				if err != nil {
 					return nil, err
 				}
 
 				fs.Value = res
 			default:
-				if col.IsNull && (val == "null" || val == "") {
-					fs.Value = nil
-				} else {
-					res, err := parser(val, format...)
-					if err != nil {
-						return nil, err
-					}
-					fs.Value = res
+				res, err := parser(val)
+				if err != nil {
+					return nil, err
 				}
+				fs.Value = res
 			}
 
 			sets = append(sets, fs)

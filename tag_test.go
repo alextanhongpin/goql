@@ -11,17 +11,17 @@ func TestTag(t *testing.T) {
 	tests := []struct {
 		name string
 		tag  string
-		exp  goql.Column
+		exp  goql.Tag
 	}{
 		{
 			name: "empty",
 			tag:  "",
-			exp:  goql.Column{},
+			exp:  goql.Tag{},
 		},
 		{
 			name: "field only",
 			tag:  "name",
-			exp: goql.Column{
+			exp: goql.Tag{
 				Name: "name",
 				Tag:  "name",
 			},
@@ -29,69 +29,47 @@ func TestTag(t *testing.T) {
 		{
 			name: "field",
 			tag:  "age,null",
-			exp: goql.Column{
-				Name:   "age",
-				IsNull: true,
-				Tag:    "age,null",
-			},
-		},
-		{
-			name: "field notnull",
-			tag:  "age,notnull",
-			exp: goql.Column{
+			exp: goql.Tag{
 				Name: "age",
-				Tag:  "age,notnull",
+				Type: goql.Type{
+					Null: true,
+				},
+				Tag: "age,null",
 			},
 		},
 		{
 			name: "field type",
 			tag:  "id,type:uuid",
-			exp: goql.Column{
-				Name:    "id",
-				SQLType: "uuid",
-				Tag:     "id,type:uuid",
+			exp: goql.Tag{
+				Name: "id",
+				Type: goql.Type{
+					Name: "uuid",
+				},
+				Tag: "id,type:uuid",
 			},
 		},
 		{
 			name: "field type array",
 			tag:  "id,type:[]uuid",
-			exp: goql.Column{
-				Name:    "id",
-				SQLType: "uuid",
-				IsArray: true,
-				Tag:     "id,type:[]uuid",
-			},
-		},
-		{
-			name: "field type format",
-			tag:  "birthday,type:date,format:20060102",
-			exp: goql.Column{
-				Format:  "20060102",
-				Name:    "birthday",
-				SQLType: "date",
-				Tag:     "birthday,type:date,format:20060102",
-			},
-		},
-		{
-			name: "field type format array",
-			tag:  "birthday,type:[]date,format:20060102",
-			exp: goql.Column{
-				Format:  "20060102",
-				Name:    "birthday",
-				IsArray: true,
-				SQLType: "date",
-				Tag:     "birthday,type:[]date,format:20060102",
+			exp: goql.Tag{
+				Name: "id",
+				Type: goql.Type{
+					Name:  "uuid",
+					Array: true,
+				},
+				Tag: "id,type:[]uuid",
 			},
 		},
 		{
 			name: "field type null alternative",
-			tag:  "birthday,type:date?,format:20060102",
-			exp: goql.Column{
-				Format:  "20060102",
-				Name:    "birthday",
-				IsNull:  true,
-				SQLType: "date",
-				Tag:     "birthday,type:date?,format:20060102",
+			tag:  "birthday,type:*date",
+			exp: goql.Tag{
+				Name: "birthday",
+				Type: goql.Type{
+					Name: "*date",
+					Null: true,
+				},
+				Tag: "birthday,type:*date",
 			},
 		},
 	}

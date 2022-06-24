@@ -8,16 +8,17 @@ import (
 	"github.com/alextanhongpin/goql"
 )
 
+// type alias needs to be registered manually
 type Hobby string
 
 type User struct {
 	// TODO: Handle sortable
-	Name      string     `sql:"name" sort:"true"` // query=, sql=?
-	Age       int        `sql:"age" sort:"true"`
-	Married   *bool      `sql:"married" sort:"true"`
-	Hobbies   []Hobby    `sql:"hobbies" sort:"true"`
-	Birthday  *time.Time `sql:"birthday" sort:"true"`
-	MarriedAt time.Time  `sql:"marriedAt" sort:"true"`
+	Name      string     `q:"name" sort:"true"` // query=, q=?
+	Age       int        `q:"age" sort:"true"`
+	Married   *bool      `q:"married" sort:"true"`
+	Hobbies   []Hobby    `q:"hobbies,type:[]string" sort:"true"`
+	Birthday  *time.Time `q:"birthday" sort:"true"`
+	MarriedAt time.Time  `q:"marriedAt" sort:"true"`
 }
 
 func main() {
@@ -35,7 +36,7 @@ func main() {
 	}
 
 	fmt.Println("sets:", sets)
-	for _, set := range sets {
-		fmt.Printf("%+v\n", set)
+	for i, set := range sets {
+		fmt.Printf("%d. %+v\n\n", i+1, set)
 	}
 }

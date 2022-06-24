@@ -62,43 +62,43 @@ func TestTypes(t *testing.T) {
 		val         any
 		null, array bool
 	}{
-		{"text", typ.s, false, false},
-		{"text", typ.sp, null, false},
-		{"text", typ.sn, null, false},
-		{"bigint", typ.i, false, false},
-		{"bigint", typ.ip, null, false},
-		{"bigint", typ.in, null, false},
-		{"double precision", typ.f, false, false},
-		{"double precision", typ.fp, null, false},
-		{"double precision", typ.fn, null, false},
-		{"boolean", typ.b, false, false},
-		{"boolean", typ.bp, null, false},
-		{"boolean", typ.bn, null, false},
-		{"timestamptz", typ.t, false, false},
-		{"timestamptz", typ.tp, null, false},
-		{"timestamptz", typ.tn, null, false},
-		{"jsonb", typ.jr, false, false},
-		{"text", typ.js, false, array},
-		{"bigint", typ.ji, false, array},
-		{"double precision", typ.jf, false, array},
-		{"boolean", typ.jb, false, array},
-		{"timestamptz", typ.jt, false, array},
-		{"inet", typ.nip, false, false},
-		{"inet", typ.nipp, null, false},
-		{"cidr", typ.nipn, false, false},
-		{"cidr", typ.nipnp, null, false},
+		{"string", typ.s, false, false},
+		{"*string", typ.sp, null, false},
+		{"sql.NullString", typ.sn, false, false},
+		{"int", typ.i, false, false},
+		{"*int", typ.ip, null, false},
+		{"sql.NullInt64", typ.in, false, false},
+		{"float64", typ.f, false, false},
+		{"*float64", typ.fp, null, false},
+		{"sql.NullFloat64", typ.fn, false, false},
+		{"bool", typ.b, false, false},
+		{"*bool", typ.bp, null, false},
+		{"sql.NullBool", typ.bn, false, false},
+		{"time.Time", typ.t, false, false},
+		{"*time.Time", typ.tp, null, false},
+		{"sql.NullTime", typ.tn, false, false},
+		{"json.RawMessage", typ.jr, false, array},
+		{"[]string", typ.js, false, array},
+		{"[]int", typ.ji, false, array},
+		{"[]float64", typ.jf, false, array},
+		{"[]bool", typ.jb, false, array},
+		{"[]time.Time", typ.jt, false, array},
+		{"net.IP", typ.nip, false, array},
+		{"*net.IP", typ.nipp, null, false},
+		{"net.IPNet", typ.nipn, false, false},
+		{"*net.IPNet", typ.nipnp, null, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.exp, func(t *testing.T) {
-			typ, null, array := goql.GetSQLType(reflect.TypeOf(tt.val))
-			if exp, got := tt.exp, typ; exp != got {
+			typ := goql.TypeOf(reflect.TypeOf(tt.val))
+			if exp, got := tt.exp, typ.Name; exp != got {
 				t.Fatalf("expected %v, got %v", exp, got)
 			}
-			if exp, got := tt.null, null; exp != got {
+			if exp, got := tt.null, typ.Null; exp != got {
 				t.Fatalf("expected %v, got %v", exp, got)
 			}
-			if exp, got := tt.array, array; exp != got {
+			if exp, got := tt.array, typ.Array; exp != got {
 				t.Fatalf("expected %v, got %v", exp, got)
 			}
 		})

@@ -24,10 +24,10 @@ func TestDecoder(t *testing.T) {
 	dec.SetFieldOps(map[string]goql.Op{
 		"name":    goql.OpEq, // Only allow equality comparison.
 		"age":     goql.OpsComparable,
-		"Married": goql.OpsNull,
+		"married": goql.OpsNull,
 	})
 
-	v, err := url.ParseQuery(`name=eq:hello&age=eq:10&Married=is:true`)
+	v, err := url.ParseQuery(`name=eq:hello&age=eq:10&married=is:true`)
 	if err != nil {
 		t.FailNow()
 	}
@@ -64,6 +64,6 @@ func TestDecoderCustomParser(t *testing.T) {
 	t.Log(fieldSets)
 }
 
-func parseUUID(in string, format ...string) (any, error) {
+func parseUUID(in string) (any, error) {
 	return uuid.Parse(in)
 }
