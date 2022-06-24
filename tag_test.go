@@ -45,6 +45,7 @@ func TestTag(t *testing.T) {
 				Type: goql.Type{
 					Name: "uuid",
 				},
+				Ops: goql.OpsComparable,
 				Tag: "id,type:uuid",
 			},
 		},
@@ -57,6 +58,7 @@ func TestTag(t *testing.T) {
 					Name:  "uuid",
 					Array: true,
 				},
+				Ops: goql.OpsComparable | goql.OpsRange,
 				Tag: "id,type:[]uuid",
 			},
 		},
@@ -69,15 +71,29 @@ func TestTag(t *testing.T) {
 					Name: "*date",
 					Null: true,
 				},
+				Ops: goql.OpsComparable | goql.OpsNull,
 				Tag: "birthday,type:*date",
+			},
+		},
+		{
+			name: "field ops",
+			tag:  "name,ops:eq",
+			exp: goql.Tag{
+				Name: "name",
+				Tag:  "name,ops:eq",
+				Ops:  goql.OpEq,
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := goql.ParseTag(tt.tag)
-			if diff := cmp.Diff(tt.exp, got); diff != "" {
+			got, err := goql.ParseTag(tt.tag)
+			if err != nil {
+				t.Fatalf("error parsing tag: %v", err)
+			}
+
+			if diff := cmp.Diff(tt.exp, *got); diff != "" {
 				t.Fatalf("+exp, -got: %s", diff)
 			}
 		})

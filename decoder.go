@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"reflect"
 	"strings"
 )
 
@@ -16,7 +15,6 @@ const (
 var (
 	ErrMultipleOperator = errors.New("goql: multiple op")
 	ErrUnknownOperator  = errors.New("goql: unknown op")
-	ErrBadOperator      = errors.New("goql: bad op")
 	ErrInvalidIs        = errors.New("goql: 'IS' must be followed by {true, false, null, unknown}")
 	ErrInvalidArray     = errors.New("goql: invalid array")
 	ErrUnknownField     = errors.New("goql: unknown field")
@@ -24,7 +22,7 @@ var (
 )
 
 type FieldSet struct {
-	Tag      Tag
+	Tag      *Tag
 	Name     string
 	Value    any
 	RawValue string
@@ -32,63 +30,42 @@ type FieldSet struct {
 }
 
 type Decoder[T any] struct {
-	opsByField map[string]Op
-	tagByField map[string]Tag
+	tagByField map[string]*Tag
 	parsers    map[string]ParserFn
 	tag        string
 }
 
-func NewDecoder[T any]() *Decoder[T] {
+func NewDecoder[T any]() (*Decoder[T], error) {
 	var t T
 
 	parserByType := NewParsers()
-	opsByField := make(map[string]Op)
-	tagByField := ParseStruct(t, StructTag)
-
-	for field, tag := range tagByField {
-		t := tag.Type
-
-		// All types are comparable.
-		ops := OpsComparable
-
-		// Null type have special operators.
-		if t.Null {
-			ops |= OpsNull
-		}
-
-		// Array type have special operators.
-		if t.Array {
-			ops |= OpsRange
-		}
-
-		// String types have special operators.
-		if t.Name == reflect.String.String() {
-			ops |= OpsText
-		}
-
-		opsByField[field] = ops
+	tagByField, err := ParseStruct(t, StructTag)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Decoder[T]{
 		tagByField: tagByField,
-		opsByField: opsByField,
 		tag:        StructTag,
 		parsers:    parserByType,
-	}
+	}, nil
 }
 
-func (d *Decoder[T]) SetStructTag(tag string) {
+func (d *Decoder[T]) SetStructTag(tag string) error {
 	if tag == "" {
 		panic("tag cannot be empty")
 	}
 
 	var t T
-	d.tag = tag
-	d.tagByField = ParseStruct(t, tag)
-}
+	tagByField, err := ParseStruct(t, tag)
+	if err != nil {
+		return err
+	}
 
-func (d *Decoder[T]) SetFieldOps(opsByField map[string]Op) {
-	d.opsByField = opsByField
+	d.tag = tag
+	d.tagByField = tagByField
+
+	return nil
 }
 
 func (d *Decoder[T]) SetParsers(parserByType map[string]ParserFn) {
@@ -96,20 +73,15 @@ func (d *Decoder[T]) SetParsers(parserByType map[string]ParserFn) {
 }
 
 func (d *Decoder[T]) Decode(values url.Values) ([]FieldSet, error) {
-	return Decode(d.opsByField, d.tagByField, d.parsers, values)
+	return Decode(d.tagByField, d.parsers, values)
 }
 
-func Decode(opsByField map[string]Op, tagByField map[string]Tag, parsers map[string]ParserFn, values url.Values) ([]FieldSet, error) {
+func Decode(tagByField map[string]*Tag, parsers map[string]ParserFn, values url.Values) ([]FieldSet, error) {
 	cache := make(map[string]bool)
 
 	var sets []FieldSet
 
-	for field, rule := range opsByField {
-		tag, ok := tagByField[field]
-		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrUnknownField, field)
-		}
-
+	for field, tag := range tagByField {
 		for _, v := range values[field] {
 			opsByField, val := split2(v, ValSeparator)
 
@@ -118,8 +90,8 @@ func Decode(opsByField map[string]Op, tagByField map[string]Tag, parsers map[str
 				return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, v)
 			}
 
-			if !rule.Has(op) {
-				return nil, fmt.Errorf("%w: %s", ErrBadOperator, v)
+			if !tag.Ops.Has(op) {
+				return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, v)
 			}
 
 			if OpsIs.Has(op) && !sqlIs(val) {

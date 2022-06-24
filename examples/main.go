@@ -29,7 +29,11 @@ func main() {
 	}
 	fmt.Println("query:", v)
 
-	dec := goql.NewDecoder[User]()
+	dec, err := goql.NewDecoder[User]()
+	if err != nil {
+		panic(err)
+	}
+
 	sets, err := dec.Decode(v)
 	if err != nil {
 		panic(err)
@@ -37,6 +41,6 @@ func main() {
 
 	fmt.Println("sets:", sets)
 	for i, set := range sets {
-		fmt.Printf("%d. %+v\n\n", i+1, set)
+		fmt.Printf("%d. %+v\n%+v\n\n", i+1, set, set.Tag)
 	}
 }
