@@ -3,7 +3,6 @@ package goql
 import (
 	"errors"
 	"fmt"
-	"strings"
 )
 
 var (
@@ -25,6 +24,7 @@ type SortDirection string
 func (o SortDirection) Valid() bool {
 	return o == SortDirectionAscending || o == SortDirectionDescending
 }
+
 func (o SortDirection) DefaultOption() SortOption {
 	switch o {
 	case SortDirectionAscending:
@@ -87,9 +87,7 @@ func NewOrder(s string) (*Order, error) {
 	}, nil
 }
 
-func ParseOrder(query string) ([]Order, error) {
-	query = strings.TrimSpace(query)
-	orders := strings.Split(query, ",")
+func ParseOrder(orders []string) ([]Order, error) {
 
 	result := make([]Order, 0, len(orders))
 

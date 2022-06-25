@@ -22,7 +22,7 @@ func ParseQuery(v url.Values) []Query {
 
 	for field, params := range v {
 		switch field {
-		case And, Or:
+		case OpAnd.String(), OpOr.String():
 			continue
 		}
 

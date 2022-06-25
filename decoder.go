@@ -4,14 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
 )
 
 const (
 	FilterTag = "q"
 	SortTag   = "sort"
-	And       = "and"
-	Or        = "or"
 )
 
 var (
@@ -124,7 +121,7 @@ func (d *Decoder[T]) Decode(values url.Values) (*Filter, error) {
 }
 
 func (d *Decoder[T]) parseSort(values url.Values) ([]Order, error) {
-	sort, err := ParseOrder(values.Get("sort_by"))
+	sort, err := ParseOrder(values["sort_by"])
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +166,7 @@ func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 
 		cacheKey := fmt.Sprintf("%s:%s", field, op)
 		if cache[cacheKey] {
-			return nil, fmt.Errorf("%w: %q.%q", ErrMultipleOperator, field, strings.ToLower(op.String()))
+			return nil, fmt.Errorf("%w: %q.%q", ErrMultipleOperator, field, op.String())
 		}
 		cache[cacheKey] = true
 
@@ -223,14 +220,13 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values url.Values) ([]FieldSet, 
 	}
 
 	conjs := make([]FieldSet, 0, len(values))
-	for _, v := range values[strings.ToLower(conj.String())] {
+	for _, v := range values[conj.String()] {
 		value, ok := Unquote(v, '(', ')')
 		if !ok {
 			return nil, fmt.Errorf("%w: %s", ErrInvalidOp, conj)
 		}
 
 		values := SplitOutsideBrackets(value)
-		fmt.Println("OUTSIDE", values, len(values))
 
 		uvals := make(url.Values)
 		avals := make(url.Values)
@@ -238,10 +234,10 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values url.Values) ([]FieldSet, 
 		for _, value := range values {
 			field, opv := Split2(value, ".")
 			switch field {
-			case Or:
-				ovals.Add(Or, opv)
-			case And:
-				avals.Add(And, opv)
+			case OpOr.String():
+				ovals.Add(OpOr.String(), opv)
+			case OpAnd.String():
+				avals.Add(OpAnd.String(), opv)
 			default:
 				uvals[field] = append(uvals[field], opv)
 			}

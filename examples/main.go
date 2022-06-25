@@ -32,11 +32,12 @@ func main() {
 		"birthday":  []string{"is:null"},
 		"hobbies":   []string{"eq:{1,2,3,}"},
 		"marriedAt": []string{"gt:" + marriedAt},
+		"height":    []string{"eq:10"},
 		"and":       []string{"(age.lt:10,age.gt:13,or.(name.eq:john,name.neq:jessie))", "(or.(height.isnot:null,height.lt:100))"},
 		"or":        []string{`(name.eq:"alice,ms",name.neq:bob)`},
-		"sort_by":   []string{"name.asc,age.desc"},
-		"height":    []string{"eq:10"},
+		"sort_by":   []string{"name.asc", "age.desc"},
 	}
+	fmt.Println(v.Encode())
 
 	dec, err := goql.NewDecoder[User]()
 	if err != nil {

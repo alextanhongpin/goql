@@ -212,3 +212,16 @@ func Unquote(str string, l, r rune) (string, bool) {
 
 	return str, false
 }
+
+func sqlIs(unk string) bool {
+	switch strings.ToLower(unk) {
+	case
+		"0", "1",
+		"f", "n", "no", "false",
+		"t", "y", "yes", "true",
+		"unknown", "null":
+		return true
+	default:
+		return false
+	}
+}

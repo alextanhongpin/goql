@@ -19,6 +19,10 @@ const (
 
 type Op int
 
+func (op Op) String() string {
+	return opsText[op]
+}
+
 func (o Op) Valid() bool {
 	return o != 0
 }
@@ -31,9 +35,9 @@ func (o Op) Is(tgt Op) bool {
 	return o == tgt
 }
 
-//go:generate stringer -type Op -trimprefix Op
 const (
-	OpEq       Op = 1 << iota // =, equals, e.g. name=eq:john becomes name = 'john'
+	opBegin    Op = 1 << iota // ^
+	OpEq                      // =, equals, e.g. name=eq:john becomes name = 'john'
 	OpNeq                     // <> or !=, not equals, e.g. name=neq:john becomes name <> 'john'
 	OpLt                      // <, less than
 	OpLte                     // <=, less than equals
@@ -62,9 +66,10 @@ const (
 	OpAdj // -|-
 
 	// Conjunctions.
-	OpNot
-	OpOr
-	OpAnd
+	OpNot // not
+	OpOr  // or
+	OpAnd // and
+	opEnd // $
 )
 
 func ParseOp(op string) (Op, bool) {
@@ -77,23 +82,34 @@ func ParseOp(op string) (Op, bool) {
 	return 0, false
 }
 
-func sqlIs(unk string) bool {
-	switch {
-	case
-		unk == "0",
-		unk == "1",
-		strings.EqualFold(unk, "f"),
-		strings.EqualFold(unk, "n"),
-		strings.EqualFold(unk, "no"),
-		strings.EqualFold(unk, "false"),
-		strings.EqualFold(unk, "t"),
-		strings.EqualFold(unk, "y"),
-		strings.EqualFold(unk, "yes"),
-		strings.EqualFold(unk, "true"),
-		strings.EqualFold(unk, "unknown"),
-		strings.EqualFold(unk, "null"):
-		return true
-	default:
-		return false
-	}
+var opsText = map[Op]string{
+	OpEq:       "eq",
+	OpNeq:      "neq",
+	OpLt:       "lt",
+	OpLte:      "lte",
+	OpGt:       "gt",
+	OpGte:      "gte",
+	OpLike:     "like",
+	OpIlike:    "ilike",
+	OpNotLike:  "notlike",
+	OpNotIlike: "notilike",
+	OpIn:       "in",
+	OpNotIn:    "notin",
+	OpIs:       "is",
+	OpIsNot:    "isnot",
+	OpFts:      "fts",
+	OpPlFts:    "plfts",
+	OpPhFts:    "phfts",
+	OpWFts:     "wfts",
+	OpCs:       "cs",
+	OpCd:       "cd",
+	OpOv:       "ov",
+	OpSl:       "sl",
+	OpSr:       "sr",
+	OpNxr:      "nxr",
+	OpNxl:      "nxl",
+	OpAdj:      "adj",
+	OpNot:      "not",
+	OpOr:       "or",
+	OpAnd:      "and",
 }
