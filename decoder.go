@@ -12,7 +12,8 @@ const (
 	TagFilter = "q"
 	TagSort   = "sort"
 
-	// Reserved query string fields.
+	// Reserved query string fields, customizable, since 'sort_by' or 'limit'
+	// could be a valid field name.
 	QuerySort   = "sort_by"
 	QueryLimit  = "limit"
 	QueryOffset = "offset"
@@ -52,56 +53,126 @@ type FieldSet struct {
 }
 
 type Decoder[T any] struct {
-	tagByField map[string]*Tag
-	parsers    map[string]ParserFn
-	tag        string
+	tags        map[string]*Tag
+	parsers     map[string]ParserFn
+	sortTag     string
+	filterTag   string
+	limitMin    int
+	limitMax    int
+	querySort   string
+	queryLimit  string
+	queryOffset string
 }
 
 func NewDecoder[T any]() (*Decoder[T], error) {
 	var t T
 
-	parserByType := NewParsers()
-	tagByField, err := ParseStruct(t, TagFilter, TagSort)
+	parsers := NewParsers()
+	tags, err := ParseStruct(t, TagFilter, TagSort)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Decoder[T]{
-		tagByField: tagByField,
-		tag:        TagFilter,
-		parsers:    parserByType,
+		tags:        tags,
+		parsers:     parsers,
+		sortTag:     TagSort,
+		filterTag:   TagFilter,
+		limitMin:    LimitMin,
+		limitMax:    LimitMax,
+		querySort:   QuerySort,
+		queryLimit:  QueryLimit,
+		queryOffset: QueryOffset,
 	}, nil
 }
 
-func (d *Decoder[T]) SetStructTag(tag string) error {
-	if tag == "" {
-		panic("tag cannot be empty")
+func (d *Decoder[T]) SetFilterTag(filterTag string) error {
+	if filterTag == "" {
+		panic("goql: filter tag cannot be empty")
 	}
 
 	var t T
-	tagByField, err := ParseStruct(t, tag, TagSort)
+	tags, err := ParseStruct(t, filterTag, d.sortTag)
 	if err != nil {
 		return err
 	}
 
-	d.tag = tag
-	d.tagByField = tagByField
+	d.filterTag = filterTag
+	d.tags = tags
 
 	return nil
 }
 
-func (d *Decoder[T]) SetParsers(parserByType map[string]ParserFn) {
-	d.parsers = parserByType
+func (d *Decoder[T]) SetSortTag(sortTag string) error {
+	if sortTag == "" {
+		panic("goql: sort tag cannot be empty")
+	}
+
+	var t T
+	tags, err := ParseStruct(t, d.filterTag, sortTag)
+	if err != nil {
+		return err
+	}
+
+	d.sortTag = sortTag
+	d.tags = tags
+
+	return nil
+}
+
+func (d *Decoder[T]) SetLimitRange(min, max int) {
+	if min == 0 || max == 0 {
+		panic("goql: limit and offset cannot be 0")
+	}
+
+	d.limitMin = min
+	d.limitMax = max
+}
+
+func (d *Decoder[T]) SetParsers(parsers map[string]ParserFn) {
+	if len(parsers) == 0 {
+		panic("goql: no parsers specified")
+	}
+
+	d.parsers = parsers
+}
+
+func (d *Decoder[T]) SetParser(name string, parserFn ParserFn) {
+	d.parsers[name] = parserFn
 }
 
 func (d *Decoder[T]) SetOps(field string, ops Op) error {
-	if _, ok := d.tagByField[field]; !ok {
+	if _, ok := d.tags[field]; !ok {
 		return fmt.Errorf("%w: %s", ErrUnknownField, field)
 	}
 
-	d.tagByField[field].Ops = ops
+	d.tags[field].Ops = ops
 
 	return nil
+}
+
+func (d *Decoder[T]) SetQuerySortName(name string) {
+	if name == "" {
+		panic("goql: query sort name cannot be empty")
+	}
+
+	d.querySort = name
+}
+
+func (d *Decoder[T]) SetQueryLimitName(name string) {
+	if name == "" {
+		panic("goql: query limit name cannot be empty")
+	}
+
+	d.queryLimit = name
+}
+
+func (d *Decoder[T]) SetQueryOffsetName(name string) {
+	if name == "" {
+		panic("goql: query offset name cannot be empty")
+	}
+
+	d.queryOffset = name
 }
 
 func (d *Decoder[T]) Decode(u url.Values) (*Filter, error) {
@@ -130,7 +201,7 @@ func (d *Decoder[T]) Decode(u url.Values) (*Filter, error) {
 }
 
 func (d *Decoder[T]) parseLimit(u url.Values) (limit, offset *int, err error) {
-	if v, ok := u[QueryLimit]; ok && len(v) > 0 {
+	if v, ok := u[d.queryLimit]; ok && len(v) > 0 {
 		var n int
 		n, err = strconv.Atoi(v[0])
 		if err != nil {
@@ -147,7 +218,7 @@ func (d *Decoder[T]) parseLimit(u url.Values) (limit, offset *int, err error) {
 		limit = &n
 	}
 
-	if v, ok := u[QueryOffset]; ok && len(v) > 0 {
+	if v, ok := u[d.queryOffset]; ok && len(v) > 0 {
 		var n int
 		n, err = strconv.Atoi(v[0])
 		if err != nil {
@@ -181,13 +252,13 @@ func (d *Decoder[T]) parseFilter(values url.Values) (ands, ors []FieldSet, err e
 }
 
 func (d *Decoder[T]) parseSort(values url.Values) ([]Order, error) {
-	sort, err := ParseOrder(values[QuerySort])
+	sort, err := ParseOrder(values[d.querySort])
 	if err != nil {
 		return nil, err
 	}
 
 	validSortByField := make(map[string]bool)
-	for field, tag := range d.tagByField {
+	for field, tag := range d.tags {
 		validSortByField[field] = tag.Sort
 	}
 
@@ -204,7 +275,7 @@ func (d *Decoder[T]) parseSort(values url.Values) ([]Order, error) {
 func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 	ands := make([]FieldSet, 0, len(values))
 
-	queries, err := ParseQuery(values, QueryAnd, QueryOr, QuerySort, QueryLimit, QueryOffset)
+	queries, err := ParseQuery(values, QueryAnd, QueryOr, d.querySort, d.queryLimit, d.queryOffset)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +283,7 @@ func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 	for _, query := range queries {
 		field, op, values := query.Field, query.Op, query.Values
 
-		tag, ok := d.tagByField[field]
+		tag, ok := d.tags[field]
 		if !ok {
 			return nil, fmt.Errorf("%w: %s", ErrUnknownField, field)
 		}
@@ -283,6 +354,7 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values url.Values) ([]FieldSet, 
 		ovals := make(url.Values)
 		for _, value := range values {
 			field, opv := Split2(value, ".")
+
 			switch field {
 			case OpOr.String():
 				ovals.Add(OpOr.String(), opv)

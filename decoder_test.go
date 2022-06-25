@@ -23,7 +23,7 @@ func TestDecoderCustomStructTag(t *testing.T) {
 		t.Fatalf("error constructing new decoder: %v", err)
 	}
 
-	if err := dec.SetStructTag("sql"); err != nil {
+	if err := dec.SetFilterTag("sql"); err != nil {
 		t.Fatalf("error setting struct tag: %v", err)
 	}
 
@@ -50,7 +50,7 @@ func TestDecoderCustomParser(t *testing.T) {
 		t.Fatalf("error constructing new decoder: %v", err)
 	}
 
-	dec.SetStructTag("sql")
+	dec.SetFilterTag("sql")
 	dec.SetParsers(map[string]goql.ParserFn{
 		// Register type
 		"uuid": parseUUID,
