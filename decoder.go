@@ -144,7 +144,18 @@ func (d *Decoder[T]) parseSort(values url.Values) ([]Order, error) {
 func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 	ands := make([]FieldSet, 0, len(values))
 	cache := make(map[string]bool)
-	queries := ParseQuery(values)
+
+	selectedValues := make(url.Values)
+	for k, v := range values {
+		switch k {
+		case OpAnd.String(), OpOr.String(), "sort_by":
+			continue
+		default:
+			selectedValues[k] = v
+		}
+
+	}
+	queries := ParseQuery(selectedValues)
 
 	for _, query := range queries {
 		field, op, value := query.Field, query.Op, query.Value

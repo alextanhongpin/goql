@@ -1,13 +1,17 @@
 package goql
 
-import "strings"
+var opsByText map[string]Op
 
-/*
+func init() {
+	opsByText = make(map[string]Op)
+	for k, v := range opsText {
+		opsByText[v] = k
+	}
+}
 
-By default, all datatypes are comparable: =, <>, <, <=, >, >=
-Since WHERE col IN (...) is pretty common in SQL, OpIn is added for most types.
-If the datatype can be NULL, then OpIs will be appended.
-*/
+// By default, all datatypes are comparable: =, <>, <, <=, >, >=
+// Since WHERE col IN (...) is pretty common in SQL, OpIn is added for most types.
+// If the datatype can be NULL, then OpIs will be appended.
 const (
 	OpsComparable     = OpEq | OpNeq | OpLt | OpLte | OpGt | OpGte | OpIn | OpNotIn
 	OpsNull           = OpIs | OpIsNot
@@ -23,21 +27,25 @@ func (op Op) String() string {
 	return opsText[op]
 }
 
+// Valid returns true if the ops is set.
 func (o Op) Valid() bool {
 	return o != 0
 }
 
+// Has checks if the ops is part of the rule.
 func (o Op) Has(tgt Op) bool {
 	return o&tgt == tgt
 }
 
+// Is checks if the op is equal the other value.
 func (o Op) Is(tgt Op) bool {
 	return o == tgt
 }
 
+// Useful reference:
+// range operators:  https://www.postgresql.org/docs/14/functions-range.html
 const (
-	opBegin    Op = 1 << iota // ^
-	OpEq                      // =, equals, e.g. name=eq:john becomes name = 'john'
+	OpEq       Op = 1 << iota // =, equals, e.g. name=eq:john becomes name = 'john'
 	OpNeq                     // <> or !=, not equals, e.g. name=neq:john becomes name <> 'john'
 	OpLt                      // <, less than
 	OpLte                     // <=, less than equals
@@ -55,31 +63,22 @@ const (
 	OpPlFts                   // Full-Text search using plain to tsquery
 	OpPhFts                   // Full-Text search using phrase to tsquery
 	OpWFts                    // Full-Text search using word.
-	// https://www.postgresql.org/docs/14/functions-range.html
-	OpCs  // @>, contains, e.g. ?tags=cs:{example,new}
-	OpCd  // <@, contained in e.g. ?values=cd:{1,2,3}
-	OpOv  // &&, Overlap
-	OpSl  // <<, strictly left of
-	OpSr  // >>, strictly right of
-	OpNxr // &<
-	OpNxl // &>
-	OpAdj // -|-
-
-	// Conjunctions.
-	OpNot // not
-	OpOr  // or
-	OpAnd // and
-	opEnd // $
+	OpCs                      // @>, contains, e.g. ?tags=cs:{example,new}
+	OpCd                      // <@, contained in e.g. ?values=cd:{1,2,3}
+	OpOv                      // &&, Overlap
+	OpSl                      // <<, strictly left of
+	OpSr                      // >>, strictly right of
+	OpNxr                     // &<
+	OpNxl                     // &>
+	OpAdj                     // -|-
+	OpNot                     // not
+	OpOr                      // or
+	OpAnd                     // and
 )
 
-func ParseOp(op string) (Op, bool) {
-	for i := OpAnd; i > 0; i = i >> 1 {
-		if strings.EqualFold(i.String(), op) {
-			return i, true
-		}
-	}
-
-	return 0, false
+func ParseOp(unk string) (Op, bool) {
+	op, ok := opsByText[unk]
+	return op, ok
 }
 
 var opsText = map[Op]string{
