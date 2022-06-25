@@ -53,7 +53,7 @@ func NewOrder(s string) (*Order, error) {
 		return nil, nil
 	}
 
-	field, direction, option := split3(s, ".")
+	field, direction, option := Split3(s, ".")
 	if direction == "" {
 		return &Order{
 			Field:     field,

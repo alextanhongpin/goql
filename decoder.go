@@ -8,7 +8,10 @@ import (
 )
 
 const (
-	StructTag = "q"
+	FilterTag = "q"
+	SortTag   = "sort"
+	And       = "and"
+	Or        = "or"
 )
 
 var (
@@ -47,14 +50,14 @@ func NewDecoder[T any]() (*Decoder[T], error) {
 	var t T
 
 	parserByType := NewParsers()
-	tagByField, err := ParseStruct(t, StructTag)
+	tagByField, err := ParseStruct(t, FilterTag, SortTag)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Decoder[T]{
 		tagByField: tagByField,
-		tag:        StructTag,
+		tag:        FilterTag,
 		parsers:    parserByType,
 	}, nil
 }
@@ -65,7 +68,7 @@ func (d *Decoder[T]) SetStructTag(tag string) error {
 	}
 
 	var t T
-	tagByField, err := ParseStruct(t, tag)
+	tagByField, err := ParseStruct(t, tag, SortTag)
 	if err != nil {
 		return err
 	}
@@ -91,39 +94,57 @@ func (d *Decoder[T]) SetOps(field string, ops Op) error {
 }
 
 func (d *Decoder[T]) Decode(values url.Values) (*Filter, error) {
-	return Decode(d.tagByField, d.parsers, values)
-}
-
-func Decode(tagByField map[string]*Tag, parsers map[string]ParserFn, values url.Values) (*Filter, error) {
-	ands, err := decodeFields(tagByField, parsers, values)
+	base, err := d.decodeFields(values)
 	if err != nil {
 		return nil, err
 	}
 
-	innerAnds, err := decodeConjunction(OpAnd, tagByField, parsers, values)
-	if err != nil {
-		return nil, err
-	}
-	ands = append(ands, innerAnds...)
-
-	ors, err := decodeConjunction(OpOr, tagByField, parsers, values)
+	ands, err := d.decodeConjunction(OpAnd, values)
 	if err != nil {
 		return nil, err
 	}
 
-	sort, err := ParseOrder(values.Get("sort_by"))
+	ands = append(base, ands...)
+
+	ors, err := d.decodeConjunction(OpOr, values)
+	if err != nil {
+		return nil, err
+	}
+
+	sorts, err := d.parseSort(values)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Filter{
-		Sort: sort,
+		Sort: sorts,
 		And:  ands,
 		Or:   ors,
 	}, nil
 }
 
-func decodeFields(tagByField map[string]*Tag, parsers map[string]ParserFn, values url.Values) ([]FieldSet, error) {
+func (d *Decoder[T]) parseSort(values url.Values) ([]Order, error) {
+	sort, err := ParseOrder(values.Get("sort_by"))
+	if err != nil {
+		return nil, err
+	}
+
+	validSortByField := make(map[string]bool)
+	for field, tag := range d.tagByField {
+		validSortByField[field] = tag.Sort
+	}
+
+	sorts := make([]Order, 0, len(sort))
+	for _, s := range sort {
+		if validSortByField[s.Field] {
+			sorts = append(sorts, s)
+		}
+	}
+
+	return sorts, nil
+}
+
+func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 	ands := make([]FieldSet, 0, len(values))
 	cache := make(map[string]bool)
 	queries := ParseQuery(values)
@@ -131,7 +152,7 @@ func decodeFields(tagByField map[string]*Tag, parsers map[string]ParserFn, value
 	for _, query := range queries {
 		field, op, value := query.Field, query.Op, query.Value
 
-		tag, ok := tagByField[field]
+		tag, ok := d.tagByField[field]
 		if !ok {
 			return nil, fmt.Errorf("%w: %s", ErrUnknownField, field)
 		}
@@ -152,7 +173,7 @@ func decodeFields(tagByField map[string]*Tag, parsers map[string]ParserFn, value
 		}
 		cache[cacheKey] = true
 
-		parser, ok := parsers[tag.Type.Name]
+		parser, ok := d.parsers[tag.Type.Name]
 		if !ok {
 			return nil, fmt.Errorf("%w: %s", ErrUnknownParser, tag.Type.Name)
 		}
@@ -171,10 +192,8 @@ func decodeFields(tagByField map[string]*Tag, parsers map[string]ParserFn, value
 				return nil, fmt.Errorf("%w: missing parantheses: %s", ErrInvalidArray, value)
 			}
 
-			vals, err := splitString(value)
-			if err != nil {
-				return nil, err
-			}
+			// Strings may contain commas, which interferes with the splitting.
+			vals := SplitCsv(value)
 
 			res, err := Map(vals, parser)
 			if err != nil {
@@ -196,7 +215,7 @@ func decodeFields(tagByField map[string]*Tag, parsers map[string]ParserFn, value
 	return ands, nil
 }
 
-func decodeConjunction(conj Op, tagByField map[string]*Tag, parsers map[string]ParserFn, values url.Values) ([]FieldSet, error) {
+func (d *Decoder[T]) decodeConjunction(conj Op, values url.Values) ([]FieldSet, error) {
 	switch conj {
 	case OpAnd, OpOr:
 	default:
@@ -210,37 +229,35 @@ func decodeConjunction(conj Op, tagByField map[string]*Tag, parsers map[string]P
 			return nil, fmt.Errorf("%w: %s", ErrInvalidOp, conj)
 		}
 
-		values := splitOutsideBrackets(value)
+		values := SplitOutsideBrackets(value)
+		fmt.Println("OUTSIDE", values, len(values))
 
-		ands := make([]FieldSet, 0, len(values))
-		ors := make([]FieldSet, 0, len(values))
-
-		urlv := make(url.Values)
+		uvals := make(url.Values)
+		avals := make(url.Values)
+		ovals := make(url.Values)
 		for _, value := range values {
-			field, opv := split2(value, ".")
+			field, opv := Split2(value, ".")
 			switch field {
-			case "or":
-				v := make(url.Values)
-				v.Set("or", opv)
-				innerOrs, err := decodeConjunction(OpOr, tagByField, parsers, v)
-				if err != nil {
-					return nil, err
-				}
-				ors = append(ors, innerOrs...)
-			case "and":
-				v := make(url.Values)
-				v.Set("and", opv)
-				innerAnds, err := decodeConjunction(OpAnd, tagByField, parsers, v)
-				if err != nil {
-					return nil, err
-				}
-				ands = append(ands, innerAnds...)
+			case Or:
+				ovals.Add(Or, opv)
+			case And:
+				avals.Add(And, opv)
 			default:
-				urlv[field] = append(urlv[field], opv)
+				uvals[field] = append(uvals[field], opv)
 			}
 		}
 
-		innerConj, err := decodeFields(tagByField, parsers, urlv)
+		ors, err := d.decodeConjunction(OpOr, ovals)
+		if err != nil {
+			return nil, err
+		}
+
+		ands, err := d.decodeConjunction(OpAnd, avals)
+		if err != nil {
+			return nil, err
+		}
+
+		innerConj, err := d.decodeFields(uvals)
 		if err != nil {
 			return nil, err
 		}

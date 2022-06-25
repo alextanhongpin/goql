@@ -2,6 +2,7 @@ package goql
 
 import (
 	"encoding/csv"
+	"fmt"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -50,7 +51,7 @@ var commonInitialisms = map[string]bool{
 	"XSS":   true,
 }
 
-func joinStrings(ss []string) (string, error) {
+func JoinCsvDeprecated(ss []string) (string, error) {
 	var sb strings.Builder
 	w := csv.NewWriter(&sb)
 	w.Comma = QueryDelimiter
@@ -65,13 +66,65 @@ func joinStrings(ss []string) (string, error) {
 	return strings.TrimSpace(sb.String()), nil
 }
 
-func splitString(s string) ([]string, error) {
+func SplitCsvDeprecated(s string) ([]string, error) {
 	r := csv.NewReader(strings.NewReader(s))
 	r.Comma = QueryDelimiter
 	return r.Read()
 }
 
-func split2(str, by string) (string, string) {
+func JoinCsv(val []string) string {
+	res := make([]string, len(val))
+	for i, s := range val {
+		if strings.Contains(s, ",") {
+			res[i] = fmt.Sprintf("%q", s)
+		} else {
+			res[i] = s
+		}
+	}
+
+	return strings.Join(res, ",")
+}
+
+func SplitCsv(val string) []string {
+	result := make([]string, 0, 8)
+	r := []rune(val)
+	var s, o int
+
+	for i := 0; i < len(r); i++ {
+		switch r[i] {
+		case '"':
+			if o > 0 {
+				o--
+			} else {
+				o++
+			}
+		case ',':
+			if o != 0 {
+				continue
+			}
+
+			if r[s] == '"' {
+				// Remove the quote from the string, so `"hello, world"` becomes `hello world`
+				result = append(result, string(r[s+1:i-1]))
+			} else {
+				result = append(result, string(r[s:i]))
+			}
+
+			s = i + 1
+		}
+	}
+	if s != len(r) {
+		if r[s] == '"' {
+			result = append(result, string(r[s+1:len(val)-1]))
+		} else {
+			result = append(result, string(r[s:]))
+		}
+	}
+
+	return result
+}
+
+func Split2(str, by string) (string, string) {
 	paths := strings.SplitN(str, by, 2)
 	switch len(paths) {
 	case 1:
@@ -83,42 +136,59 @@ func split2(str, by string) (string, string) {
 	}
 }
 
-func split3(str, by string) (string, string, string) {
-	a, b := split2(str, by)
-	c, d := split2(b, by)
+func Split3(str, by string) (string, string, string) {
+	a, b := Split2(str, by)
+	c, d := Split2(b, by)
 
 	return a, c, d
 }
 
-func splitOutsideBrackets(val string) []string {
+func SplitOutsideBrackets(val string) []string {
 	result := make([]string, 0, 8)
 	r := []rune(val)
-	var s, o, c int
+	var s, b int
+	var q int
 
 	for i := 0; i < len(r); i++ {
-		if r[i] == '(' {
-			o++
-		}
-		if r[i] == ')' {
-			o--
-		}
-		if r[i] == ',' {
-			if o+c != 0 {
+		switch r[i] {
+		case '"':
+			if q != 0 {
+				q--
+			} else {
+				q++
+			}
+		case '(':
+			b++
+		case ')':
+			b--
+		case ',':
+			if b != 0 || q != 0 {
 				continue
+			}
+
+			if r[s] == '"' {
+				// Remove the quote from the string, so `"hello, world"` becomes `hello world`
+				result = append(result, string(r[s+1:i-1]))
 			} else {
 				result = append(result, string(r[s:i]))
-				s = i + 1
 			}
+
+			s = i + 1
 		}
 	}
 	if s != len(r) {
-		result = append(result, string(r[s:]))
+		if r[s] == '"' {
+			// Remove the quote from the string, so `"hello, world"` becomes `hello world`
+			result = append(result, string(r[s+1:len(val)-1]))
+		} else {
+			result = append(result, string(r[s:]))
+		}
 	}
 
 	return result
 }
 
-func lowerCommonInitialism(field string) string {
+func LowerCommonInitialism(field string) string {
 	if field == "" {
 		return ""
 	}

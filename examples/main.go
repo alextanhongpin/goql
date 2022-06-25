@@ -14,26 +14,28 @@ type Hobby string
 
 type User struct {
 	// TODO: Handle sortable
-	Name      string     `q:"name" sort:"true"` // query=, q=?
-	Age       int        `q:"age" sort:"true"`
-	Married   *bool      `q:"married" sort:"true"`
-	Hobbies   []Hobby    `q:"hobbies,type:[]string" sort:"true"`
-	Birthday  *time.Time `q:"birthday" sort:"true"`
-	MarriedAt time.Time  `q:"marriedAt" sort:"true"`
+	Name      string `sort:"true"` // query=, q=?
+	Age       int    `sort:"true"`
+	Married   *bool
+	Hobbies   []Hobby `q:"hobbies,type:[]string"`
+	Birthday  *time.Time
+	MarriedAt time.Time
+	Height    *int
 }
 
 func main() {
 	marriedAt := time.Now().UTC().Format(time.RFC3339)
 	v := url.Values{
-		"name":      []string{"eq:john", "in:{football,basketball,tennis}", "notin:{alice,bob}"},
+		"name":      []string{"eq:john", "in:{football,basketball,tennis}", `notin:{alice,bob,"charles, junior"}`},
 		"age":       []string{"gt:13", "in:{10,20,100}"},
 		"married":   []string{"is:true"},
 		"birthday":  []string{"is:null"},
 		"hobbies":   []string{"eq:{1,2,3,}"},
 		"marriedAt": []string{"gt:" + marriedAt},
-		"and":       []string{"(age.lt:10,age.gt:13,or.(name.eq:john,name.neq:jessie))"},
-		"or":        []string{"(name.eq:alice,name.neq:bob)"},
+		"and":       []string{"(age.lt:10,age.gt:13,or.(name.eq:john,name.neq:jessie))", "(or.(height.isnot:null,height.lt:100))"},
+		"or":        []string{`(name.eq:"alice,ms",name.neq:bob)`},
 		"sort_by":   []string{"name.asc,age.desc"},
+		"height":    []string{"eq:10"},
 	}
 
 	dec, err := goql.NewDecoder[User]()

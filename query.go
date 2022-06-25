@@ -22,12 +22,12 @@ func ParseQuery(v url.Values) []Query {
 
 	for field, params := range v {
 		switch field {
-		case "and", "or":
+		case And, Or:
 			continue
 		}
 
 		for _, param := range params {
-			key, val := split2(param, ":")
+			key, val := Split2(param, ":")
 			if val == "" {
 				continue
 			}
@@ -36,6 +36,9 @@ func ParseQuery(v url.Values) []Query {
 			if !ok {
 				continue
 			}
+
+			// For scenarios with commas in the value fields.
+			val, _ = Unquote(val, '"', '"')
 
 			result = append(result, Query{
 				Field: field,

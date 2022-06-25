@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -13,6 +14,7 @@ type Tag struct {
 	Type Type
 	Name string
 	Tag  string
+	Sort bool
 	Ops  Op
 }
 
@@ -97,7 +99,7 @@ func NewOps(t Type) Op {
 	return ops
 }
 
-func ParseStruct(unk any, key string) (map[string]*Tag, error) {
+func ParseStruct(unk any, filterKey, sortKey string) (map[string]*Tag, error) {
 	tagByField := make(map[string]*Tag)
 
 	v := reflect.Indirect(reflect.ValueOf(unk))
@@ -105,7 +107,7 @@ func ParseStruct(unk any, key string) (map[string]*Tag, error) {
 
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
-		tag := f.Tag.Get(key)
+		tag := f.Tag.Get(filterKey)
 		if tag == "-" {
 			continue
 		}
@@ -117,8 +119,11 @@ func ParseStruct(unk any, key string) (map[string]*Tag, error) {
 		}
 
 		if c.Name == "" {
-			c.Name = lowerCommonInitialism(f.Name)
+			c.Name = LowerCommonInitialism(f.Name)
 		}
+
+		sort, _ := strconv.ParseBool(f.Tag.Get(sortKey))
+		c.Sort = sort
 
 		// Infer type from the tag.
 		if c.Type.Valid() {
