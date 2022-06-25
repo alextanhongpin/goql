@@ -88,7 +88,6 @@ func NewOrder(s string) (*Order, error) {
 }
 
 func ParseOrder(orders []string) ([]Order, error) {
-
 	result := make([]Order, 0, len(orders))
 
 	for _, s := range orders {

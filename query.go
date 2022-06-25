@@ -15,11 +15,12 @@ func (q Query) String() string {
 	return fmt.Sprintf("%s.%s:%v", q.Field, q.Op, q.Values)
 }
 
-// ParseQuery parses the query with operators, excluding
-func ParseQuery(v url.Values, excluding ...string) ([]Query, error) {
+// ParseQuery parses the query with operators, excludes
+func ParseQuery(v url.Values, excludes ...string) ([]Query, error) {
 	result := make([]Query, 0, len(v))
+
 	exclude := make(map[string]bool)
-	for _, val := range excluding {
+	for _, val := range excludes {
 		exclude[val] = true
 	}
 

@@ -24,7 +24,7 @@ func NewParsers() map[string]ParserFn {
 		"*int32":     ParseNumericPointer[int32],
 		"int64":      ParseInt64,
 		"*int64":     ParseNumericPointer[int64],
-		"int":        ParseInt64,
+		"int":        ParseInt,
 		"*int":       ParseNumericPointer[int],
 		"string":     ParseString,
 		"*string":    ParseStringPointer[string],
@@ -65,6 +65,10 @@ func ParseFloat64(in string) (any, error) {
 	return strconv.ParseFloat(in, 64)
 }
 
+func ParseInt(in string) (any, error) {
+	return strconv.Atoi(in)
+}
+
 func ParseInt16(in string) (any, error) {
 	return strconv.ParseInt(in, 10, 16)
 }
@@ -84,10 +88,9 @@ func ParseString(in string) (any, error) {
 func ParseStringPointer[T string | bool | time.Time](in string) (any, error) {
 	var b []byte
 	switch in {
-	case
-		"null",
-		"true",
-		"false":
+	// This can still be a string 'true' or 'false', not boolean.
+	// Otherwise, we could have just called strconv.ParseBool
+	case "null", "true", "false":
 		b = []byte(in)
 	default:
 		b = strconv.AppendQuote(nil, in)

@@ -4,11 +4,24 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 )
 
 const (
-	FilterTag = "q"
-	SortTag   = "sort"
+	// Tag name for struct parsing, customizable.
+	TagFilter = "q"
+	TagSort   = "sort"
+
+	// Reserved query string fields.
+	QuerySort   = "sort_by"
+	QueryLimit  = "limit"
+	QueryOffset = "offset"
+	QueryAnd    = "and"
+	QueryOr     = "or"
+
+	// Pagination limit.
+	LimitMin = 1
+	LimitMax = 20
 )
 
 var (
@@ -20,9 +33,11 @@ var (
 )
 
 type Filter struct {
-	Sort []Order
-	And  []FieldSet
-	Or   []FieldSet
+	Sort   []Order
+	And    []FieldSet
+	Or     []FieldSet
+	Limit  *int
+	Offset *int
 }
 
 type FieldSet struct {
@@ -46,14 +61,14 @@ func NewDecoder[T any]() (*Decoder[T], error) {
 	var t T
 
 	parserByType := NewParsers()
-	tagByField, err := ParseStruct(t, FilterTag, SortTag)
+	tagByField, err := ParseStruct(t, TagFilter, TagSort)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Decoder[T]{
 		tagByField: tagByField,
-		tag:        FilterTag,
+		tag:        TagFilter,
 		parsers:    parserByType,
 	}, nil
 }
@@ -64,7 +79,7 @@ func (d *Decoder[T]) SetStructTag(tag string) error {
 	}
 
 	var t T
-	tagByField, err := ParseStruct(t, tag, SortTag)
+	tagByField, err := ParseStruct(t, tag, TagSort)
 	if err != nil {
 		return err
 	}
@@ -89,38 +104,84 @@ func (d *Decoder[T]) SetOps(field string, ops Op) error {
 	return nil
 }
 
-func (d *Decoder[T]) Decode(values url.Values) (*Filter, error) {
-	base, err := d.decodeFields(values)
+func (d *Decoder[T]) Decode(u url.Values) (*Filter, error) {
+	limit, offset, err := d.parseLimit(u)
 	if err != nil {
 		return nil, err
 	}
 
-	ands, err := d.decodeConjunction(OpAnd, values)
+	ands, ors, err := d.parseFilter(u)
 	if err != nil {
 		return nil, err
 	}
 
-	ands = append(base, ands...)
-
-	ors, err := d.decodeConjunction(OpOr, values)
-	if err != nil {
-		return nil, err
-	}
-
-	sorts, err := d.parseSort(values)
+	sorts, err := d.parseSort(u)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Filter{
-		Sort: sorts,
-		And:  ands,
-		Or:   ors,
+		Sort:   sorts,
+		And:    ands,
+		Or:     ors,
+		Limit:  limit,
+		Offset: offset,
 	}, nil
 }
 
+func (d *Decoder[T]) parseLimit(u url.Values) (limit, offset *int, err error) {
+	if v, ok := u[QueryLimit]; ok && len(v) > 0 {
+		var n int
+		n, err = strconv.Atoi(v[0])
+		if err != nil {
+			return
+		}
+
+		if n < LimitMin {
+			n = LimitMin
+		}
+		if n > LimitMax {
+			n = LimitMax
+		}
+
+		limit = &n
+	}
+
+	if v, ok := u[QueryOffset]; ok && len(v) > 0 {
+		var n int
+		n, err = strconv.Atoi(v[0])
+		if err != nil {
+			return
+		}
+		offset = &n
+	}
+
+	return
+}
+
+func (d *Decoder[T]) parseFilter(values url.Values) (ands, ors []FieldSet, err error) {
+	base, err := d.decodeFields(values)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ands, err = d.decodeConjunction(OpAnd, values)
+	if err != nil {
+		return
+	}
+
+	ands = append(base, ands...)
+
+	ors, err = d.decodeConjunction(OpOr, values)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 func (d *Decoder[T]) parseSort(values url.Values) ([]Order, error) {
-	sort, err := ParseOrder(values["sort_by"])
+	sort, err := ParseOrder(values[QuerySort])
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +204,7 @@ func (d *Decoder[T]) parseSort(values url.Values) ([]Order, error) {
 func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 	ands := make([]FieldSet, 0, len(values))
 
-	queries, err := ParseQuery(values, OpAnd.String(), OpOr.String(), "sort_by")
+	queries, err := ParseQuery(values, QueryAnd, QueryOr, QuerySort, QueryLimit, QueryOffset)
 	if err != nil {
 		return nil, err
 	}
@@ -159,11 +220,6 @@ func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 		hasOp := tag.Ops.Has(op)
 		if !hasOp {
 			return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, query)
-		}
-
-		if OpsNull.Has(op) && !sqlIs(values[0]) {
-			// OpIs/OpIsNot must have value: true, false, unknown or null.
-			return nil, fmt.Errorf("%w: %s", ErrInvalidOp, query)
 		}
 
 		parser, ok := d.parsers[tag.Type.Name]

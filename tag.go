@@ -99,7 +99,7 @@ func NewOps(t Type) Op {
 	return ops
 }
 
-func ParseStruct(unk any, filterKey, sortKey string) (map[string]*Tag, error) {
+func ParseStruct(unk any, filterTag, sortTag string) (map[string]*Tag, error) {
 	tagByField := make(map[string]*Tag)
 
 	v := reflect.Indirect(reflect.ValueOf(unk))
@@ -107,7 +107,7 @@ func ParseStruct(unk any, filterKey, sortKey string) (map[string]*Tag, error) {
 
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
-		tag := f.Tag.Get(filterKey)
+		tag := f.Tag.Get(filterTag)
 		if tag == "-" {
 			continue
 		}
@@ -122,7 +122,7 @@ func ParseStruct(unk any, filterKey, sortKey string) (map[string]*Tag, error) {
 			c.Name = LowerCommonInitialism(f.Name)
 		}
 
-		sort, _ := strconv.ParseBool(f.Tag.Get(sortKey))
+		sort, _ := strconv.ParseBool(f.Tag.Get(sortTag))
 		c.Sort = sort
 
 		// Infer type from the tag.
