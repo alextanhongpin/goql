@@ -15,17 +15,11 @@ func (q Query) String() string {
 	return fmt.Sprintf("%s=%s:%s", q.Field, q.Op, q.Value)
 }
 
-// ParseQuery parses the query with operators, excluding
-// AND and OR conjunctions.
+// ParseQuery parses the query with operators.
 func ParseQuery(v url.Values) []Query {
 	result := make([]Query, 0, len(v))
 
 	for field, params := range v {
-		switch field {
-		case OpAnd.String(), OpOr.String():
-			continue
-		}
-
 		for _, param := range params {
 			key, val := Split2(param, ":")
 			if val == "" {
