@@ -10,25 +10,27 @@ type ParserFn func(s string) (any, error)
 
 func NewParsers() map[string]ParserFn {
 	return map[string]ParserFn{
-		"time.Time":  ParseTime,
-		"*time.Time": ParseStringPointer[time.Time],
-		"bool":       ParseBool,
-		"*bool":      ParseStringPointer[bool],
-		"float32":    ParseFloat32,
-		"*float32":   ParseNumericPointer[float32],
-		"float64":    ParseFloat64,
-		"*float64":   ParseNumericPointer[float64],
-		"int16":      ParseInt16,
-		"*int16":     ParseNumericPointer[int16],
-		"int32":      ParseInt32,
-		"*int32":     ParseNumericPointer[int32],
-		"int64":      ParseInt64,
-		"*int64":     ParseNumericPointer[int64],
-		"int":        ParseInt,
-		"*int":       ParseNumericPointer[int],
-		"string":     ParseString,
-		"*string":    ParseStringPointer[string],
-		"":           ParseNop,
+		"time.Time":       ParseTime,
+		"*time.Time":      ParseStringPointer[time.Time],
+		"bool":            ParseBool,
+		"*bool":           ParseStringPointer[bool],
+		"float32":         ParseFloat32,
+		"*float32":        ParseNumericPointer[float32],
+		"float64":         ParseFloat64,
+		"*float64":        ParseNumericPointer[float64],
+		"int16":           ParseInt16,
+		"*int16":          ParseNumericPointer[int16],
+		"int32":           ParseInt32,
+		"*int32":          ParseNumericPointer[int32],
+		"int64":           ParseInt64,
+		"*int64":          ParseNumericPointer[int64],
+		"int":             ParseInt,
+		"*int":            ParseNumericPointer[int],
+		"string":          ParseString,
+		"*string":         ParseStringPointer[string],
+		"json.RawMessage": ParseJSON,
+		"[]byte":          ParseByte,
+		"":                ParseNop,
 	}
 }
 
@@ -83,6 +85,19 @@ func ParseInt64(in string) (any, error) {
 
 func ParseString(in string) (any, error) {
 	return in, nil
+}
+
+func ParseByte(in string) (any, error) {
+	return []byte(in), nil
+}
+
+func ParseJSON(in string) (any, error) {
+	var m map[string]any
+	if err := json.Unmarshal([]byte(in), &m); err != nil {
+		return nil, err
+	}
+
+	return json.RawMessage(in), nil
 }
 
 func ParseStringPointer[T string | bool | time.Time](in string) (any, error) {
