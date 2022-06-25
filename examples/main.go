@@ -51,11 +51,7 @@ func main() {
 
 	fmt.Println(v.Encode())
 
-	dec, err := goql.NewDecoder[User]()
-	if err != nil {
-		panic(err)
-	}
-
+	dec := goql.NewDecoder[User]()
 	filter, err := dec.Decode(v)
 	if err != nil {
 		panic(err)

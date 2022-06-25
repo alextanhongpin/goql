@@ -17,3 +17,9 @@ Reference:
 TODO
 - add ops all
 - all customizing field ops
+
+## FAQ
+
+> What if I need to filter some fields from `url.Values`?
+
+Filter it manually before passing to `NewDecoder(values)`.

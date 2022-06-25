@@ -64,13 +64,13 @@ type Decoder[T any] struct {
 	queryOffset string
 }
 
-func NewDecoder[T any]() (*Decoder[T], error) {
+func NewDecoder[T any]() *Decoder[T] {
 	var t T
 
 	parsers := NewParsers()
 	tags, err := ParseStruct(t, TagFilter, TagSort)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	return &Decoder[T]{
@@ -83,10 +83,22 @@ func NewDecoder[T any]() (*Decoder[T], error) {
 		querySort:   QuerySort,
 		queryLimit:  QueryLimit,
 		queryOffset: QueryOffset,
-	}, nil
+	}
 }
 
-func (d *Decoder[T]) SetFilterTag(filterTag string) error {
+// Validate checks if the parser exists for all the inferred types. This is
+// called internally before decode is called.
+func (d *Decoder[T]) Validate() error {
+	for _, tag := range d.tags {
+		if _, ok := d.parsers[tag.Type.Name]; !ok {
+			return fmt.Errorf("%w: missing parser for type %q", ErrUnknownParser, tag.Type.Name)
+		}
+	}
+
+	return nil
+}
+
+func (d *Decoder[T]) SetFilterTag(filterTag string) *Decoder[T] {
 	if filterTag == "" {
 		panic("goql: filter tag cannot be empty")
 	}
@@ -94,16 +106,16 @@ func (d *Decoder[T]) SetFilterTag(filterTag string) error {
 	var t T
 	tags, err := ParseStruct(t, filterTag, d.sortTag)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	d.filterTag = filterTag
 	d.tags = tags
 
-	return nil
+	return d
 }
 
-func (d *Decoder[T]) SetSortTag(sortTag string) error {
+func (d *Decoder[T]) SetSortTag(sortTag string) *Decoder[T] {
 	if sortTag == "" {
 		panic("goql: sort tag cannot be empty")
 	}
@@ -111,71 +123,95 @@ func (d *Decoder[T]) SetSortTag(sortTag string) error {
 	var t T
 	tags, err := ParseStruct(t, d.filterTag, sortTag)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	d.sortTag = sortTag
 	d.tags = tags
 
-	return nil
+	return d
 }
 
-func (d *Decoder[T]) SetLimitRange(min, max int) {
+func (d *Decoder[T]) SetLimitRange(min, max int) *Decoder[T] {
 	if min == 0 || max == 0 {
 		panic("goql: limit and offset cannot be 0")
 	}
 
 	d.limitMin = min
 	d.limitMax = max
+
+	return d
 }
 
-func (d *Decoder[T]) SetParsers(parsers map[string]ParserFn) {
+func (d *Decoder[T]) SetParsers(parsers map[string]ParserFn) *Decoder[T] {
 	if len(parsers) == 0 {
 		panic("goql: no parsers specified")
 	}
 
 	d.parsers = parsers
+
+	return d
 }
 
-func (d *Decoder[T]) SetParser(name string, parserFn ParserFn) {
+func (d *Decoder[T]) SetParser(name string, parserFn ParserFn) *Decoder[T] {
 	d.parsers[name] = parserFn
+
+	return d
 }
 
-func (d *Decoder[T]) SetOps(field string, ops Op) error {
+func (d *Decoder[T]) SetOps(field string, ops Op) *Decoder[T] {
+	if field == "" {
+		panic("goql: set ops field cannot be empty")
+	}
+
 	if _, ok := d.tags[field]; !ok {
-		return fmt.Errorf("%w: %s", ErrUnknownField, field)
+		panic(fmt.Errorf("%w: %q", ErrUnknownField, field))
+	}
+
+	if !ops.Valid() {
+		panic(fmt.Errorf("%w: %q", ErrInvalidOp, field))
 	}
 
 	d.tags[field].Ops = ops
 
-	return nil
+	return d
 }
 
-func (d *Decoder[T]) SetQuerySortName(name string) {
+func (d *Decoder[T]) SetQuerySortName(name string) *Decoder[T] {
 	if name == "" {
 		panic("goql: query sort name cannot be empty")
 	}
 
 	d.querySort = name
+
+	return d
 }
 
-func (d *Decoder[T]) SetQueryLimitName(name string) {
+func (d *Decoder[T]) SetQueryLimitName(name string) *Decoder[T] {
 	if name == "" {
 		panic("goql: query limit name cannot be empty")
 	}
 
 	d.queryLimit = name
+
+	return d
 }
 
-func (d *Decoder[T]) SetQueryOffsetName(name string) {
+func (d *Decoder[T]) SetQueryOffsetName(name string) *Decoder[T] {
 	if name == "" {
 		panic("goql: query offset name cannot be empty")
 	}
 
 	d.queryOffset = name
+
+	return d
 }
 
 func (d *Decoder[T]) Decode(u url.Values) (*Filter, error) {
+	if err := d.Validate(); err != nil {
+		return nil, err
+	}
+
 	limit, offset, err := d.parseLimit(u)
 	if err != nil {
 		return nil, err
@@ -208,11 +244,12 @@ func (d *Decoder[T]) parseLimit(u url.Values) (limit, offset *int, err error) {
 			return
 		}
 
-		if n < LimitMin {
-			n = LimitMin
+		if n < d.limitMin {
+			n = d.limitMin
 		}
-		if n > LimitMax {
-			n = LimitMax
+
+		if n > d.limitMax {
+			n = d.limitMax
 		}
 
 		limit = &n
@@ -224,6 +261,11 @@ func (d *Decoder[T]) parseLimit(u url.Values) (limit, offset *int, err error) {
 		if err != nil {
 			return
 		}
+
+		if n < 0 {
+			n = 0
+		}
+
 		offset = &n
 	}
 
