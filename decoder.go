@@ -12,12 +12,11 @@ const (
 )
 
 var (
-	ErrMultipleOperator = errors.New("goql: multiple op")
-	ErrUnknownOperator  = errors.New("goql: unknown op")
-	ErrInvalidOp        = errors.New("goql: invalid op")
-	ErrInvalidArray     = errors.New("goql: invalid array")
-	ErrUnknownField     = errors.New("goql: unknown field")
-	ErrUnknownParser    = errors.New("goql: unknown parser")
+	ErrUnknownOperator = errors.New("goql: unknown op")
+	ErrInvalidOp       = errors.New("goql: invalid op")
+	ErrUnknownField    = errors.New("goql: unknown field")
+	ErrUnknownParser   = errors.New("goql: unknown parser")
+	ErrTooManyValues   = errors.New("goql: too many values")
 )
 
 type Filter struct {
@@ -27,11 +26,11 @@ type Filter struct {
 }
 
 type FieldSet struct {
-	Tag      *Tag
-	Name     string
-	Value    any
-	RawValue string
-	Op       string
+	Tag    *Tag
+	Name   string
+	Value  any
+	Values []string
+	Op     string
 
 	Or  []FieldSet
 	And []FieldSet
@@ -143,22 +142,14 @@ func (d *Decoder[T]) parseSort(values url.Values) ([]Order, error) {
 
 func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 	ands := make([]FieldSet, 0, len(values))
-	cache := make(map[string]bool)
 
-	selectedValues := make(url.Values)
-	for k, v := range values {
-		switch k {
-		case OpAnd.String(), OpOr.String(), "sort_by":
-			continue
-		default:
-			selectedValues[k] = v
-		}
-
+	queries, err := ParseQuery(values, OpAnd.String(), OpOr.String(), "sort_by")
+	if err != nil {
+		return nil, err
 	}
-	queries := ParseQuery(selectedValues)
 
 	for _, query := range queries {
-		field, op, value := query.Field, query.Op, query.Value
+		field, op, values := query.Field, query.Op, query.Values
 
 		tag, ok := d.tagByField[field]
 		if !ok {
@@ -170,16 +161,10 @@ func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 			return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, query)
 		}
 
-		if OpsNull.Has(op) && !sqlIs(value) {
+		if OpsNull.Has(op) && !sqlIs(values[0]) {
 			// OpIs/OpIsNot must have value: true, false, unknown or null.
 			return nil, fmt.Errorf("%w: %s", ErrInvalidOp, query)
 		}
-
-		cacheKey := fmt.Sprintf("%s:%s", field, op)
-		if cache[cacheKey] {
-			return nil, fmt.Errorf("%w: %q.%q", ErrMultipleOperator, field, op.String())
-		}
-		cache[cacheKey] = true
 
 		parser, ok := d.parsers[tag.Type.Name]
 		if !ok {
@@ -187,33 +172,31 @@ func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 		}
 
 		fs := FieldSet{
-			Tag:      tag,
-			Name:     field,
-			Op:       op.String(),
-			RawValue: value,
+			Tag:    tag,
+			Name:   field,
+			Op:     op.String(),
+			Values: values,
 		}
 
 		switch {
 		case OpsIn.Has(op), tag.Type.Array:
-			value, ok = Unquote(value, '{', '}')
-			if !ok {
-				return nil, fmt.Errorf("%w: missing parantheses: %s", ErrInvalidArray, value)
-			}
-
-			// Strings may contain commas, which interferes with the splitting.
-			vals := SplitCsv(value)
-
-			res, err := Map(vals, parser)
+			res, err := Map(values, parser)
 			if err != nil {
 				return nil, err
 			}
 
 			fs.Value = res
 		default:
+			if len(values) > 1 {
+				return nil, fmt.Errorf("%w: %s", ErrTooManyValues, query)
+			}
+
+			value, _ := Unquote(values[0], '"', '"')
 			res, err := parser(value)
 			if err != nil {
 				return nil, err
 			}
+
 			fs.Value = res
 		}
 
@@ -250,7 +233,13 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values url.Values) ([]FieldSet, 
 			case OpAnd.String():
 				avals.Add(OpAnd.String(), opv)
 			default:
-				uvals[field] = append(uvals[field], opv)
+				rawOp, value := Split2(opv, ":")
+				op, ok := ParseOp(rawOp)
+				if !ok {
+					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, rawOp)
+				}
+
+				uvals.Add(fmt.Sprintf("%s.%s", field, op), value)
 			}
 		}
 
@@ -270,12 +259,12 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values url.Values) ([]FieldSet, 
 		}
 
 		fs := FieldSet{
-			Name:     conj.String(),
-			Op:       conj.String(),
-			Value:    value,
-			RawValue: v,
-			And:      ands,
-			Or:       ors,
+			Name:   conj.String(),
+			Op:     conj.String(),
+			Value:  value,
+			Values: values,
+			And:    ands,
+			Or:     ors,
 		}
 
 		switch conj {

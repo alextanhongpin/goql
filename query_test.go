@@ -8,15 +8,19 @@ import (
 )
 
 func TestQuery(t *testing.T) {
-	v := url.Values{
-		"name":    []string{"eq:john", "neq:jane"},
-		"age":     []string{"gt:10", "lt:100"},
-		"married": []string{"is:true", "bad value"},
-		"and":     []string{"(age.is:true,or(age.eq:13, age.eq.17))"},
-		"or":      []string{"married.isnot:true"},
-	}
+	v := make(url.Values)
+	v.Set("name.eq", "john")
+	v.Set("name.neq", "jane")
+	v.Set("age.gt", "10")
+	v.Set("age.lt", "100")
+	v.Set("married.is", "true")
+	v.Set("and", "(age.is:true,or(age.eq:13,age.eq.17))")
+	v.Set("or", "(married.isnot:true)")
 
-	queries := goql.ParseQuery(v)
+	queries, err := goql.ParseQuery(v, goql.OpAnd.String(), goql.OpOr.String())
+	if err != nil {
+		t.Fatalf("failed to parse query: %s", err)
+	}
 
 	if exp, got := 5, len(queries); exp != got {
 		t.Fatalf("expected %d, got %d: %v", exp, got, queries)

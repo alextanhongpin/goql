@@ -6,41 +6,48 @@ import (
 )
 
 type Query struct {
-	Field string
-	Op    Op
-	Value string
+	Field  string
+	Op     Op
+	Values []string
 }
 
 func (q Query) String() string {
-	return fmt.Sprintf("%s=%s:%s", q.Field, q.Op, q.Value)
+	return fmt.Sprintf("%s.%s:%v", q.Field, q.Op, q.Values)
 }
 
-// ParseQuery parses the query with operators.
-func ParseQuery(v url.Values) []Query {
+// ParseQuery parses the query with operators, excluding
+func ParseQuery(v url.Values, excluding ...string) ([]Query, error) {
 	result := make([]Query, 0, len(v))
-
-	for field, params := range v {
-		for _, param := range params {
-			key, val := Split2(param, ":")
-			if val == "" {
-				continue
-			}
-
-			op, ok := ParseOp(key)
-			if !ok {
-				continue
-			}
-
-			// For scenarios with commas in the value fields.
-			val, _ = Unquote(val, '"', '"')
-
-			result = append(result, Query{
-				Field: field,
-				Op:    op,
-				Value: val,
-			})
-		}
+	exclude := make(map[string]bool)
+	for _, val := range excluding {
+		exclude[val] = true
 	}
 
-	return result
+	for key, values := range v {
+		// Skip zero values.
+		if len(values) == 0 {
+			continue
+		}
+		if exclude[key] {
+			continue
+		}
+
+		field, operator := Split2(key, ".")
+		if field == "" {
+			return nil, fmt.Errorf("%w: %s", ErrUnknownField, key)
+		}
+
+		op, ok := ParseOp(operator)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, key)
+		}
+
+		result = append(result, Query{
+			Field:  field,
+			Op:     op,
+			Values: values,
+		})
+	}
+
+	return result, nil
 }

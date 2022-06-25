@@ -25,18 +25,30 @@ type User struct {
 
 func main() {
 	marriedAt := time.Now().UTC().Format(time.RFC3339)
-	v := url.Values{
-		"name":      []string{"eq:john", "in:{football,basketball,tennis}", `notin:{alice,bob,"charles, junior"}`},
-		"age":       []string{"gt:13", "in:{10,20,100}"},
-		"married":   []string{"is:true"},
-		"birthday":  []string{"is:null"},
-		"hobbies":   []string{"eq:{1,2,3,}"},
-		"marriedAt": []string{"gt:" + marriedAt},
-		"height":    []string{"eq:10"},
-		"and":       []string{"(age.lt:10,age.gt:13,or.(name.eq:john,name.neq:jessie))", "(or.(height.isnot:null,height.lt:100))"},
-		"or":        []string{`(name.eq:"alice,ms",name.neq:bob)`},
-		"sort_by":   []string{"name.asc", "age.desc"},
-	}
+	v := make(url.Values)
+	v.Set("name.eq", "john")
+	v.Add("name.in", "alpha")
+	v.Add("name.in", "beta")
+	v.Add("name.in", "gamma")
+	v.Add("name.notin", "alice")
+	v.Add("name.notin", "bob")
+	v.Add("name.notin", "charles, junior")
+	v.Set("age.gt", "13")
+	v.Add("age.in", "13")
+	v.Add("age.in", "17")
+	v.Set("married.is", "true")
+	v.Set("birthday.is", "null")
+	v.Add("hobbies.eq", "football")
+	v.Add("hobbies.eq", "music")
+	v.Add("hobbies.eq", "drawing")
+	v.Set("marriedAt.gt", marriedAt)
+	v.Set("height.eq", "10")
+	v.Add("and", "(age.lt:10,age.gt:13,or.(name.eq:john,name.neq:jessie))")
+	v.Add("and", "(or.(height.isnot:null,height.lt:100))")
+	v.Add("or", `(name.eq:"alice,ms",name.neq:bob)`)
+	v.Add("sort_by", "name.asc")
+	v.Add("sort_by", "age.desc")
+
 	fmt.Println(v.Encode())
 
 	dec, err := goql.NewDecoder[User]()

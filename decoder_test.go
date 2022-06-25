@@ -27,7 +27,7 @@ func TestDecoderCustomStructTag(t *testing.T) {
 		t.Fatalf("error setting struct tag: %v", err)
 	}
 
-	v, err := url.ParseQuery(`name=eq:hello&age=eq:10&married=is:true`)
+	v, err := url.ParseQuery(`name.eq=hello&age.eq=10&married.is=true`)
 	if err != nil {
 		t.FailNow()
 	}
@@ -57,7 +57,7 @@ func TestDecoderCustomParser(t *testing.T) {
 	})
 
 	id := uuid.New()
-	v, err := url.ParseQuery(`id=eq:` + id.String())
+	v, err := url.ParseQuery(`id.eq=` + id.String())
 	if err != nil {
 		t.FailNow()
 	}
@@ -92,7 +92,7 @@ func TestDecoderSetOps(t *testing.T) {
 	}
 
 	t.Run("valid ops", func(t *testing.T) {
-		v, err := url.ParseQuery(`name=eq:hello`)
+		v, err := url.ParseQuery(`name.eq=hello`)
 		if err != nil {
 			t.FailNow()
 		}
@@ -104,7 +104,7 @@ func TestDecoderSetOps(t *testing.T) {
 	})
 
 	t.Run("invalid ops", func(t *testing.T) {
-		v, err := url.ParseQuery(`name=neq:hello`)
+		v, err := url.ParseQuery(`name.neq=hello`)
 		if err != nil {
 			t.FailNow()
 		}
@@ -127,7 +127,7 @@ func TestDecoderTagOps(t *testing.T) {
 	}
 
 	t.Run("valid ops", func(t *testing.T) {
-		v, err := url.ParseQuery(`name=eq:hello`)
+		v, err := url.ParseQuery(`name.eq=hello`)
 		if err != nil {
 			t.FailNow()
 		}
@@ -140,7 +140,7 @@ func TestDecoderTagOps(t *testing.T) {
 	})
 
 	t.Run("invalid ops", func(t *testing.T) {
-		v, err := url.ParseQuery(`name=neq:hello`)
+		v, err := url.ParseQuery(`name.neq=hello`)
 		if err != nil {
 			t.FailNow()
 		}
@@ -173,14 +173,24 @@ func TestDecoderNullTime(t *testing.T) {
 
 	now := time.Now()
 	filter, err := dec.Decode(url.Values{
-		"marriedAt": []string{"is:null", "gt:" + now.Format(time.RFC3339)},
+		"marriedAt.gt": []string{now.Format(time.RFC3339)},
+		"marriedAt.is": []string{"null"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	var a, b goql.FieldSet
+	if filter.And[0].Op == goql.OpIs.String() {
+		a = filter.And[0]
+		b = filter.And[0]
+	} else {
+		a = filter.And[1]
+		b = filter.And[0]
+	}
+
 	var nullTime sql.NullTime
-	if exp, got := nullTime, filter.And[0].Value; exp != got {
+	if exp, got := nullTime, a.Value; exp != got {
 		t.Fatalf("expected %v, got %v", exp, got)
 	}
 
@@ -193,7 +203,7 @@ func TestDecoderNullTime(t *testing.T) {
 		Time:  now,
 		Valid: true,
 	}
-	if exp, got := nonNullTime, filter.And[1].Value; exp != got {
+	if exp, got := nonNullTime, b.Value; exp != got {
 		t.Fatalf("expected %v, got %v", exp, got)
 	}
 
