@@ -48,6 +48,10 @@ type Order struct {
 	Option    SortOption
 }
 
+func (o Order) String() string {
+	return fmt.Sprintf("%s %s %s", o.Field, o.Direction, o.Option)
+}
+
 func NewOrder(s string) (*Order, error) {
 	if s == "" {
 		return nil, nil
