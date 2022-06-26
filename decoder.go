@@ -352,7 +352,7 @@ func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 		}
 
 		switch {
-		case OpsIn.Has(op), tag.Type.Array:
+		case OpsMany.Has(op), tag.Type.Array:
 			res, err := Map(values, parser)
 			if err != nil {
 				return nil, err

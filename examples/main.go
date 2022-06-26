@@ -13,8 +13,7 @@ import (
 type Hobby string
 
 type User struct {
-	// TODO: Handle sortable
-	Name      string `sort:"true"` // query=, q=?
+	Name      string `sort:"true"`
 	Age       int    `sort:"true"`
 	Married   *bool
 	Hobbies   []Hobby `q:"hobbies,type:[]string"`

@@ -19,6 +19,8 @@ const (
 	OpsLike           = OpLike | OpNotLike | OpIlike | OpNotIlike
 	OpsFullTextSearch = OpFts | OpPlFts | OpPhFts | OpWFts
 	OpsRange          = OpCs | OpCd | OpOv | OpSl | OpSr | OpNxr | OpNxl | OpAdj
+	// OpsMany operators supports multiple values.
+	OpsMany = OpsIn | OpsLike
 )
 
 type Op int

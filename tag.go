@@ -119,6 +119,7 @@ func ParseStruct(unk any, filterTag, sortTag string) (map[string]*Tag, error) {
 		}
 
 		if c.Name == "" {
+			// TODO: Make this customizable.
 			c.Name = LowerCommonInitialism(f.Name)
 		}
 
