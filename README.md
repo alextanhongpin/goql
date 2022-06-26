@@ -1,4 +1,4 @@
-# goql
+# goql [![Go Reference](https://pkg.go.dev/badge/github.com/alextanhongpin/goql.svg)](https://pkg.go.dev/github.com/alextanhongpin/goql)
 
 Parse query string to Postgres SQL.
 
