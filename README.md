@@ -8,6 +8,7 @@ Requires `go 1.18+`.
 
 - customizable field names, field ops, query string fields, as well as struct tags
 - supports many operators used by Postgres
+- handles conjunction (and/or)
 - handles type conversion from query string to designated struct field's type
 - handles limit/offset
 - handles sorting
