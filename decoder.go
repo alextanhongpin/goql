@@ -30,6 +30,7 @@ var (
 	ErrInvalidOp       = errors.New("goql: invalid op")
 	ErrUnknownField    = errors.New("goql: unknown field")
 	ErrUnknownParser   = errors.New("goql: unknown parser")
+	ErrBadValue        = errors.New("goql: bad value")
 	ErrTooManyValues   = errors.New("goql: too many values")
 )
 
