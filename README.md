@@ -4,6 +4,8 @@ Parse query string to Postgres SQL operators. This library does not generate the
 
 Requires `go 1.18+`.
 
+for strongly-type approach, see rough implementation [here](https://github.com/alextanhongpin/go-learn/blob/master/sql-filter.md).
+
 ## Features
 
 - customizable field names, field ops, query string fields, as well as struct tags
