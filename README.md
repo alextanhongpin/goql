@@ -239,6 +239,19 @@ type User struct {
 | ID string `q:",null"`           | null               | another approach of specifying `null` types                                                                                                    |
 | ID string `q:",ops:eq,neq"`     | ops                | specifies the list of supported ops. In this example, only `id.eq=v` and `id.neq=v` is valid. This can be further overwritten by `dec.SetOps`. |
 
+	
+Examples of valid tags:
+	
+```go
+q:",null"
+q:"custom_name,null"
+q:"custom_name,type:uuid"
+q:"custom_name,ops:eq,neq"
+q:"custom_name,type:uuid,ops:eq,neq"
+q:"custom_name,type:[]uuid"
+q:"custom_name,type:[]*uuid"
+q:"custom_name,type:[]*uuid,ops:eq,neq,in,notin"
+```
 
 ## Ops
 
