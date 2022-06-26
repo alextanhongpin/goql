@@ -118,18 +118,6 @@ Basic datatypes (int, float, string, bool, time):
 
 Some operators such as `IN`, `LIKE`, `ILIKE` and their negation `NOT` supports multiple values:
 
-| op       | querystring                                       | sql                                                  |
-|----------|---------------------------------------------------|------------------------------------------------------|
-| eq       | `hobbies.eq=swimming&hobbies.eq=dancing`            | `hobbies = array['swimming', 'dancing']`               |
-| neq      | `hobbies.neq=swimming&hobbies.neq=dancing`          | `hobbies <> array['swimming', 'dancing']`              |
-| lt       | `scores.lt=50&scores.lt=100`                        | `scores < array[10, 100]`                              |
-| lte      | `scores.lte=50&scores.lte=100`                      | `scores <= array[10, 100]`                             |
-| gt       | `scores.gt=50&scores.gt=100`                        | `scores >= array[10, 100]`                             |
-| gte      | `scores.gte=50&scores.gte=100`                      | `scores >= array[10, 100]`                             |
-
-
-If the target type is an `array` [^1], then multiple values are accepted too:
-
 | op       | querystring                                         | sql                                                    |
 |----------|-----------------------------------------------------|--------------------------------------------------------|
 | like     | `title.like=programming%&title.like=music%`         | `title like any(array['programming%', 'music%'])`      |
@@ -138,6 +126,17 @@ If the target type is an `array` [^1], then multiple values are accepted too:
 | notilike | `title.notilike=programming%&title.notilike=music%` | `title not ilike all(array['programming%', 'music%'])` |
 | in       | `hobbies.in=programming&hobbies.in=music`           | `hobbies in ('programming', 'music')`                  |
 | notin    | `hobbies.notin=programming&hobbies.notin=music`     | `hobbies not in ('programming', 'music')`              |
+
+If the target type is an `array` [^1], then multiple values are accepted too:
+
+| op       | querystring                                       | sql                                                  |
+|----------|---------------------------------------------------|------------------------------------------------------|
+| eq       | `hobbies.eq=swimming&hobbies.eq=dancing`            | `hobbies = array['swimming', 'dancing']`               |
+| neq      | `hobbies.neq=swimming&hobbies.neq=dancing`          | `hobbies <> array['swimming', 'dancing']`              |
+| lt       | `scores.lt=50&scores.lt=100`                        | `scores < array[10, 100]`                              |
+| lte      | `scores.lte=50&scores.lte=100`                      | `scores <= array[10, 100]`                             |
+| gt       | `scores.gt=50&scores.gt=100`                        | `scores >= array[10, 100]`                             |
+| gte      | `scores.gte=50&scores.gte=100`                      | `scores >= array[10, 100]`                             |
 
 ## And/Or
 
