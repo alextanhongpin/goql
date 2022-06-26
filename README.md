@@ -141,7 +141,7 @@ If the target type is an `array` [^1], then multiple values are accepted too:
 ## And/Or
 
 
-`AND`/`OR` needs to be wrapped in open/close brackets:
+The values of `AND/OR` needs to be wrapped in a bracket. Everything in the bracket is an `AND` operation.
 
 | op  | querystring                                                         | sql                                                                           |
 |-----|---------------------------------------------------------------------|-------------------------------------------------------------------------------|
