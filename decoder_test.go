@@ -3,6 +3,7 @@ package goql_test
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/url"
 	"reflect"
 	"strings"
@@ -45,12 +46,17 @@ func TestDecoderCustomParser(t *testing.T) {
 
 	v := make(url.Values)
 	v.Set("id.eq", id.String())
+	v.Add("id.in", id.String())
+	v.Add("id.in", id.String())
+
+	t.Logf("encode: %v", v.Encode())
 
 	dec := goql.NewDecoder[Book]()
 	err := dec.Validate()
 	if !errors.Is(err, goql.ErrUnknownParser) {
 		t.FailNow()
 	}
+
 	t.Logf("validateError: %s", err)
 
 	dec.SetParser("uuid", parseUUID)
@@ -59,16 +65,16 @@ func TestDecoderCustomParser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	filter, err := dec.Decode(v)
+	f, err := dec.Decode(v)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if exp, got := id, filter.And[0].Value; exp != got {
+	if exp, got := id, f.And[0].Value; exp != got {
 		t.Fatalf("expected %v, got %v", exp, got)
 	}
 
-	t.Log(filter)
+	t.Log(f)
 }
 
 func parseUUID(in string) (any, error) {
@@ -371,4 +377,174 @@ func TestParserValidator(t *testing.T) {
 func parseEmail(in string) (any, error) {
 	email := Email(in)
 	return email, email.Validate()
+}
+
+func TestDecodeAnd(t *testing.T) {
+	type User struct {
+		Name string
+		Age  int
+	}
+
+	v := make(url.Values)
+	v.Set("and", "(age.gt:13,age.lt:30,or.(name.ilike:alice%,name.notilike:bob%))")
+
+	dec := goql.NewDecoder[User]()
+	f, err := dec.Decode(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	debug(f.And, "AND", 0)
+	debug(f.Or, "OR", 0)
+
+	if exp, got := 2, len(f.And[0].And); exp != got {
+		t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+	}
+
+	t.Run("valid age.gt:13", func(t *testing.T) {
+		t.Parallel()
+
+		ageGt13 := f.And[0].And[0]
+		if exp, got := "age", ageGt13.Name; exp != got {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+		}
+
+		if exp, got := goql.OpGt.String(), ageGt13.Op; exp != got {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+		}
+
+		if exp, got := 13, ageGt13.Value; exp != got {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+		}
+	})
+
+	t.Run("valid age.lt:30", func(t *testing.T) {
+		t.Parallel()
+
+		ageLt30 := f.And[0].And[1]
+		if exp, got := "age", ageLt30.Name; exp != got {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+		}
+
+		if exp, got := goql.OpLt.String(), ageLt30.Op; exp != got {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+		}
+
+		if exp, got := 30, ageLt30.Value; exp != got {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+		}
+	})
+
+	t.Run("valid OR", func(t *testing.T) {
+		t.Parallel()
+
+		ors := f.And[0].Or[0].And
+		if exp, got := 2, len(ors); exp != got {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.Or)
+		}
+
+		t.Run("valid name.ilike:alice%", func(t *testing.T) {
+			nameIlike := ors[0]
+
+			if exp, got := "name", nameIlike.Name; exp != got {
+				t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+			}
+
+			if exp, got := goql.OpIlike.String(), nameIlike.Op; exp != got {
+				t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+			}
+
+			if exp, got := []any{"alice%"}, nameIlike.Value; !reflect.DeepEqual(exp, got) {
+				t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+			}
+		})
+
+		t.Run("valid name.notilike:bob%", func(t *testing.T) {
+			nameNotIlike := ors[1]
+
+			if exp, got := "name", nameNotIlike.Name; exp != got {
+				t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+			}
+
+			if exp, got := goql.OpNotIlike.String(), nameNotIlike.Op; exp != got {
+				t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+			}
+
+			if exp, got := []any{"bob%"}, nameNotIlike.Value; !reflect.DeepEqual(exp, got) {
+				t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+			}
+		})
+	})
+}
+
+func TestDecodeOr(t *testing.T) {
+	type User struct {
+		Height *int
+	}
+
+	v := make(url.Values)
+	v.Set("or", "(height.isnot:null,height.gte:170)")
+	v.Add("or", "(height.eq:0)")
+	v.Add("or", "(height.gt:200)")
+
+	dec := goql.NewDecoder[User]()
+	f, err := dec.Decode(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	debug(f.And, "AND", 0)
+	debug(f.Or, "OR", 0)
+
+	ors := f.Or[0].And
+	if exp, got := 2, len(ors); exp != got {
+		t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+	}
+
+	t.Run("valid height.isnot:null", func(t *testing.T) {
+		heightIsNotNull := ors[0]
+
+		if exp, got := "height", heightIsNotNull.Name; exp != got {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+		}
+
+		if exp, got := goql.OpIsNot.String(), heightIsNotNull.Op; exp != got {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+		}
+
+		if exp, got := (*int)(nil), heightIsNotNull.Value; !reflect.DeepEqual(exp, got) {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+		}
+	})
+
+	t.Run("valid height.gte:170", func(t *testing.T) {
+		heightGte170 := ors[1]
+
+		if exp, got := "height", heightGte170.Name; exp != got {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+		}
+
+		if exp, got := goql.OpGte.String(), heightGte170.Op; exp != got {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+		}
+
+		height := 170
+		if exp, got := &height, heightGte170.Value; !reflect.DeepEqual(exp, got) {
+			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+		}
+	})
+}
+
+var debug func(sets []goql.FieldSet, msg string, depth int)
+
+func init() {
+	debug = func(sets []goql.FieldSet, msg string, depth int) {
+		for i, set := range sets {
+			tab := strings.Repeat("\t", depth)
+			fmt.Printf("%s[%s]:%d. %s %s %#v\n", tab, msg, i+1, set.Name, set.Op, set.Value)
+
+			debug(set.And, "AND", depth+1)
+			debug(set.Or, "OR", depth+1)
+		}
+	}
 }

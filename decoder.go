@@ -283,14 +283,14 @@ func (d *Decoder[T]) parseFilter(values url.Values) (ands, ors []FieldSet, err e
 		return nil, nil, err
 	}
 
-	ands, err = d.decodeConjunction(OpAnd, values)
+	ands, err = d.decodeConjunction(OpAnd, values[OpAnd.String()])
 	if err != nil {
 		return
 	}
 
 	ands = append(base, ands...)
 
-	ors, err = d.decodeConjunction(OpOr, values)
+	ors, err = d.decodeConjunction(OpOr, values[OpOr.String()])
 	if err != nil {
 		return
 	}
@@ -380,7 +380,7 @@ func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 	return ands, nil
 }
 
-func (d *Decoder[T]) decodeConjunction(conj Op, values url.Values) ([]FieldSet, error) {
+func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, error) {
 	switch conj {
 	case OpAnd, OpOr:
 	default:
@@ -388,7 +388,7 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values url.Values) ([]FieldSet, 
 	}
 
 	conjs := make([]FieldSet, 0, len(values))
-	for _, v := range values[conj.String()] {
+	for _, v := range values {
 		value, ok := Unquote(v, '(', ')')
 		if !ok {
 			return nil, fmt.Errorf("%w: %s", ErrInvalidOp, conj)
@@ -396,17 +396,16 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values url.Values) ([]FieldSet, 
 
 		values := SplitOutsideBrackets(value)
 
+		var andvals, orvals []string
 		uvals := make(url.Values)
-		avals := make(url.Values)
-		ovals := make(url.Values)
 		for _, value := range values {
 			field, opv := Split2(value, ".")
 
 			switch field {
 			case OpOr.String():
-				ovals.Add(OpOr.String(), opv)
+				orvals = append(orvals, opv)
 			case OpAnd.String():
-				avals.Add(OpAnd.String(), opv)
+				andvals = append(andvals, opv)
 			default:
 				rawOp, value := Split2(opv, ":")
 				op, ok := ParseOp(rawOp)
@@ -418,12 +417,12 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values url.Values) ([]FieldSet, 
 			}
 		}
 
-		ors, err := d.decodeConjunction(OpOr, ovals)
+		ors, err := d.decodeConjunction(OpOr, orvals)
 		if err != nil {
 			return nil, err
 		}
 
-		ands, err := d.decodeConjunction(OpAnd, avals)
+		ands, err := d.decodeConjunction(OpAnd, andvals)
 		if err != nil {
 			return nil, err
 		}
@@ -442,12 +441,8 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values url.Values) ([]FieldSet, 
 			Or:     ors,
 		}
 
-		switch conj {
-		case OpAnd:
-			fs.And = append(fs.And, innerConj...)
-		case OpOr:
-			fs.Or = append(fs.Or, innerConj...)
-		}
+		fs.And = append(innerConj, fs.And...)
+
 		conjs = append(conjs, fs)
 	}
 

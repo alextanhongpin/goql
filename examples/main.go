@@ -43,7 +43,7 @@ func main() {
 	v.Set("marriedAt.gt", marriedAt)
 	v.Set("height.eq", "10")
 	v.Add("and", "(age.lt:10,age.gt:13,or.(name.eq:john,name.neq:jessie))")
-	v.Add("and", "(or.(height.isnot:null,height.lt:100))")
+	v.Add("or", "(height.isnot:null,height.lt:100)")
 	v.Add("or", `(name.eq:"alice,ms",name.neq:bob)`)
 	v.Add("sort_by", "name.asc")
 	v.Add("sort_by", "age.desc")
@@ -56,19 +56,19 @@ func main() {
 		panic(err)
 	}
 
-	var debug func(sets []goql.FieldSet, depth int)
-	debug = func(sets []goql.FieldSet, depth int) {
+	var debug func(sets []goql.FieldSet, msg string, depth int)
+	debug = func(sets []goql.FieldSet, msg string, depth int) {
 		for i, set := range sets {
 			tab := strings.Repeat("\t", depth)
-			fmt.Printf("%s%d. %s %s %#v\n", tab, i+1, set.Name, set.Op, set.Value)
+			fmt.Printf("%s[%s]:%d. %s %s %#v\n", tab, msg, i+1, set.Name, set.Op, set.Value)
 
-			debug(set.And, depth+1)
-			debug(set.Or, depth+1)
+			debug(set.And, "AND", depth+1)
+			debug(set.Or, "OR", depth+1)
 		}
 	}
 
-	debug(filter.And, 0)
-	debug(filter.Or, 0)
+	debug(filter.And, "AND", 0)
+	debug(filter.Or, "OR", 0)
 	for _, sort := range filter.Sort {
 		fmt.Printf("sort: %+v\n", sort)
 	}

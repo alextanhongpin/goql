@@ -5,6 +5,7 @@ import (
 	"net/url"
 )
 
+// Query represents the parsed query string with operators.
 type Query struct {
 	Field  string
 	Op     Op
@@ -15,7 +16,7 @@ func (q Query) String() string {
 	return fmt.Sprintf("%s.%s:%v", q.Field, q.Op, q.Values)
 }
 
-// ParseQuery parses the query with operators, excludes
+// ParseQuery parses the query with operators.
 func ParseQuery(v url.Values, excludes ...string) ([]Query, error) {
 	result := make([]Query, 0, len(v))
 
@@ -29,6 +30,7 @@ func ParseQuery(v url.Values, excludes ...string) ([]Query, error) {
 		if len(values) == 0 {
 			continue
 		}
+
 		if exclude[key] {
 			continue
 		}
