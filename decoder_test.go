@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,12 +28,12 @@ func TestDecoderCustomStructTag(t *testing.T) {
 	dec := goql.NewDecoder[User]()
 	dec.SetFilterTag("sql")
 
-	filter, err := dec.Decode(v)
+	f, err := dec.Decode(v)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Log(filter)
+	t.Log(f.And)
 }
 
 func TestDecoderCustomParser(t *testing.T) {
@@ -331,4 +332,43 @@ func TestSort(t *testing.T) {
 			t.Fatalf("expected %v, got %v", exp, got)
 		}
 	})
+}
+
+var ErrInvalidEmail = errors.New("bad email format")
+
+type Email string
+
+func (e Email) Validate() error {
+	if !strings.Contains(string(e), "@") {
+		return ErrInvalidEmail
+	}
+
+	return nil
+}
+
+type User struct {
+	Email Email `q:",type:email"` // Register custom type.
+}
+
+func TestParserValidator(t *testing.T) {
+	dec := goql.NewDecoder[User]()
+	dec.SetParser("email", parseEmail)
+
+	v := make(url.Values)
+	v.Set("email.eq", "bad email")
+	_, err := dec.Decode(v)
+	if err == nil {
+		t.FailNow()
+	}
+
+	if !errors.Is(err, ErrInvalidEmail) {
+		t.Fatalf("expected %v, got %v", ErrInvalidEmail, err)
+	}
+
+	t.Logf("validator: %v", err)
+}
+
+func parseEmail(in string) (any, error) {
+	email := Email(in)
+	return email, email.Validate()
 }

@@ -52,6 +52,10 @@ type FieldSet struct {
 	And []FieldSet
 }
 
+func (f FieldSet) String() string {
+	return fmt.Sprintf("%v %v %#v", f.Name, f.Op, f.Value)
+}
+
 type Decoder[T any] struct {
 	tags        map[string]*Tag
 	parsers     map[string]ParserFn
