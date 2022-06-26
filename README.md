@@ -1,6 +1,6 @@
 # goql [![Go Reference](https://pkg.go.dev/badge/github.com/alextanhongpin/goql.svg)](https://pkg.go.dev/github.com/alextanhongpin/goql)
 
-Parse query string to Postgres SQL.
+Parse query string to Postgres SQL operators. This library does not generate the SQL statements, but it can be paired with other ORMs to generate dynamic SQL.
 
 Requires `go 1.18+`.
 
