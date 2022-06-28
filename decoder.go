@@ -410,7 +410,7 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 			if !ok {
 				return nil, fmt.Errorf("%w: %s", ErrInvalidConjunction, opv)
 			}
-			vals := SplitCsv(vl)
+			vals := SplitOutsideBrackets(vl)
 
 			orvals = append(orvals, vals...)
 		case OpAnd.String():
@@ -418,7 +418,7 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 			if !ok {
 				return nil, fmt.Errorf("%w: %s", ErrInvalidConjunction, opv)
 			}
-			vals := SplitCsv(vl)
+			vals := SplitOutsideBrackets(vl)
 
 			andvals = append(andvals, vals...)
 		default:
