@@ -3,6 +3,8 @@ package goql
 import (
 	"fmt"
 	"net/url"
+	"sort"
+	"strings"
 )
 
 // Query represents the parsed query string with operators.
@@ -52,5 +54,23 @@ func ParseQuery(v url.Values, excludes ...string) ([]Query, error) {
 		})
 	}
 
+	sort.Slice(result, func(i, j int) bool {
+		lhs, rhs := result[i], result[j]
+		byField := strings.Compare(lhs.Field, rhs.Field)
+		byOp := strings.Compare(lhs.Op.String(), rhs.Op.String())
+
+		return sortBy(+byField, +byOp)
+	})
+
 	return result, nil
+}
+
+func sortBy(dir ...int) bool {
+	for _, c := range dir {
+		if c != 0 {
+			return c < 0
+		}
+	}
+
+	return dir[len(dir)-1] < 0
 }

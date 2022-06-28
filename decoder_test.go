@@ -488,9 +488,9 @@ func TestDecodeOr(t *testing.T) {
 	}
 
 	v := make(url.Values)
-	v.Add("or", "and.(height.isnot:null,height.gte:170)")
 	v.Add("or", "height.eq:0")
 	v.Add("or", "height.gt:200")
+	v.Add("or", "and.(height.isnot:null,height.gte:170)")
 
 	dec := goql.NewDecoder[User]()
 	f, err := dec.Decode(v)
@@ -501,13 +501,13 @@ func TestDecodeOr(t *testing.T) {
 	debug(f.And, "AND", 0)
 	debug(f.Or, "OR", 0)
 
-	ors := f.Or[0].And
+	ors := f.Or[2].And
 	if exp, got := 2, len(ors); exp != got {
 		t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 	}
 
 	t.Run("valid height.isnot:null", func(t *testing.T) {
-		heightIsNotNull := ors[0]
+		heightIsNotNull := ors[1]
 
 		if exp, got := "height", heightIsNotNull.Name; exp != got {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
@@ -523,7 +523,7 @@ func TestDecodeOr(t *testing.T) {
 	})
 
 	t.Run("valid height.gte:170", func(t *testing.T) {
-		heightGte170 := ors[1]
+		heightGte170 := ors[0]
 
 		if exp, got := "height", heightGte170.Name; exp != got {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
@@ -538,6 +538,31 @@ func TestDecodeOr(t *testing.T) {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 		}
 	})
+}
+
+func TestDecodeNested(t *testing.T) {
+	type User struct {
+		Height *int
+	}
+
+	v := make(url.Values)
+	v.Add("and", "or.(height.gt:100,height.lt:100,and.(height.gt:100,or.(height.gt:10,height.in:10,height.in:20),height.lt:200))")
+	v.Add("and", "height.in:100")
+	v.Add("and", "height.in:200")
+	v.Add("and", "or.(height.in:50,height.in:100)")
+	v.Add("or", "and.(height.isnot:null,height.gte:170,and.(height.gt:100,height.lt:200,or.(height.gt:100,height.lt:200)))")
+	v.Add("or", "height.eq:0")
+	v.Add("or", "height.gt:200")
+
+	dec := goql.NewDecoder[User]()
+	f, err := dec.Decode(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	debug(f.And, "AND", 0)
+	debug(f.Or, "OR", 0)
+
 }
 
 var debug func(sets []goql.FieldSet, msg string, depth int)

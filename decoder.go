@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 )
 
@@ -399,8 +400,10 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 
 	conjs := make([]FieldSet, 0, len(values))
 
-	for _, value := range values {
+	uvals := make(url.Values)
 
+	sort.Strings(values)
+	for _, value := range values {
 		var andvals, orvals []string
 		field, opv := Split2(value, ".")
 
@@ -428,12 +431,7 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 				return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, rawOp)
 			}
 
-			fs, err := d.decodeField(Query{Field: field, Op: op, Values: []string{rawValue}})
-			if err != nil {
-				return nil, err
-			}
-
-			conjs = append(conjs, *fs)
+			uvals.Add(fmt.Sprintf("%s.%s", field, op), rawValue)
 		}
 
 		ors, err := d.decodeConjunction(OpOr, orvals)
@@ -459,6 +457,13 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 			conjs = append(conjs, fs)
 		}
 	}
+
+	innerConjs, err := d.decodeFields(uvals)
+	if err != nil {
+		return nil, err
+	}
+
+	conjs = append(innerConjs, conjs...)
 
 	return conjs, nil
 }
