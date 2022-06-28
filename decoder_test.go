@@ -386,7 +386,12 @@ func TestDecodeAnd(t *testing.T) {
 	}
 
 	v := make(url.Values)
-	v.Set("and", "(age.gt:13,age.lt:30,or.(name.ilike:alice%,name.notilike:bob%))")
+	v["and"] = []string{
+		"age.gt:13",
+		"age.lt:30",
+		"or.(name.ilike:alice%,name.notilike:bob%)",
+	}
+	//v.Set("and", "(age.gt:13,age.lt:30,or.(name.ilike:alice%,name.notilike:bob%))")
 
 	dec := goql.NewDecoder[User]()
 	f, err := dec.Decode(v)
@@ -397,14 +402,14 @@ func TestDecodeAnd(t *testing.T) {
 	debug(f.And, "AND", 0)
 	debug(f.Or, "OR", 0)
 
-	if exp, got := 2, len(f.And[0].And); exp != got {
+	if exp, got := 3, len(f.And); exp != got {
 		t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 	}
 
 	t.Run("valid age.gt:13", func(t *testing.T) {
 		t.Parallel()
 
-		ageGt13 := f.And[0].And[0]
+		ageGt13 := f.And[0]
 		if exp, got := "age", ageGt13.Name; exp != got {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 		}
@@ -414,14 +419,14 @@ func TestDecodeAnd(t *testing.T) {
 		}
 
 		if exp, got := 13, ageGt13.Value; exp != got {
-			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+			t.Fatalf("expected %v (%T), got %v (%T): %v", exp, exp, got, got, f.And)
 		}
 	})
 
 	t.Run("valid age.lt:30", func(t *testing.T) {
 		t.Parallel()
 
-		ageLt30 := f.And[0].And[1]
+		ageLt30 := f.And[1]
 		if exp, got := "age", ageLt30.Name; exp != got {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 		}
@@ -431,14 +436,14 @@ func TestDecodeAnd(t *testing.T) {
 		}
 
 		if exp, got := 30, ageLt30.Value; exp != got {
-			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
+			t.Fatalf("expected %v (%T), got %v (%T): %v", exp, exp, got, got, f.And)
 		}
 	})
 
 	t.Run("valid OR", func(t *testing.T) {
 		t.Parallel()
 
-		ors := f.And[0].Or[0].And
+		ors := f.And[2].Or
 		if exp, got := 2, len(ors); exp != got {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.Or)
 		}
@@ -483,9 +488,9 @@ func TestDecodeOr(t *testing.T) {
 	}
 
 	v := make(url.Values)
-	v.Set("or", "(height.isnot:null,height.gte:170)")
-	v.Add("or", "(height.eq:0)")
-	v.Add("or", "(height.gt:200)")
+	v.Add("or", "and.(height.isnot:null,height.gte:170)")
+	v.Add("or", "height.eq:0")
+	v.Add("or", "height.gt:200")
 
 	dec := goql.NewDecoder[User]()
 	f, err := dec.Decode(v)

@@ -143,13 +143,13 @@ If the target type is an `array` [^1], then multiple values are accepted too:
 ## And/Or
 
 
-The values of `AND/OR` needs to be wrapped in a bracket. Everything in the bracket is an `AND` operation.
+`AND/OR` can be chained and nested.
 
-| op  | querystring                                                         | sql                                                                           |
-|-----|---------------------------------------------------------------------|-------------------------------------------------------------------------------|
-| and | `and=(age.gt:13,age.lt:30,or.(name.ilike:alice%,name.notilike:bob%))` | `AND (age > 13 && age < 30 OR (name ilike 'alice%' and name not ilike 'bob%'))` |
-| or  | `or=(height.isnot:null,height.gte:170)`                               | `OR (height is not null AND height >= 170)`                                     |
-| or  | `or=(height.isnot:null)&or=(height.gte:170)`                          | `OR height is not null OR height >= 170`                                        |
+| op  | querystring                                                                 | sql                                                                             |
+|-----|-----------------------------------------------------------------------------|---------------------------------------------------------------------------------|
+| and | `and=age.gt:13&and=age.lt:30&or=and.(name.ilike:alice%,name.notilike:bob%)` | `AND age > 13 AND age < 30 OR (name ilike 'alice%' AND name not ilike 'bob%'))` |
+| or  | `or=and.(height.isnot:null,height.gte:170)`                                 | `OR (height is not null AND height >= 170)`                                     |
+| or  | `or=height.isnot:null&or=height.gte:170`                                | `OR height is not null OR height >= 170`                                        |
 
 ## Limit/Offset
 
@@ -241,9 +241,9 @@ type User struct {
 | ID string `q:",null"`           | null               | another approach of specifying `null` types                                                                                                    |
 | ID string `q:",ops:eq,neq"`     | ops                | specifies the list of supported ops. In this example, only `id.eq=v` and `id.neq=v` is valid. This can be further overwritten by `dec.SetOps`. |
 
-	
+
 Examples of valid tags:
-	
+
 ```go
 q:",null"
 q:"custom_name,null"

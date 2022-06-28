@@ -26,12 +26,13 @@ const (
 )
 
 var (
-	ErrUnknownOperator = errors.New("goql: unknown op")
-	ErrInvalidOp       = errors.New("goql: invalid op")
-	ErrUnknownField    = errors.New("goql: unknown field")
-	ErrUnknownParser   = errors.New("goql: unknown parser")
-	ErrBadValue        = errors.New("goql: bad value")
-	ErrTooManyValues   = errors.New("goql: too many values")
+	ErrUnknownOperator    = errors.New("goql: unknown op")
+	ErrInvalidOp          = errors.New("goql: invalid op")
+	ErrUnknownField       = errors.New("goql: unknown field")
+	ErrUnknownParser      = errors.New("goql: unknown parser")
+	ErrInvalidConjunction = errors.New("goql: invalid conjunction")
+	ErrBadValue           = errors.New("goql: bad value")
+	ErrTooManyValues      = errors.New("goql: too many values")
 )
 
 type Filter struct {
@@ -319,6 +320,56 @@ func (d *Decoder[T]) parseSort(values url.Values) ([]Order, error) {
 	return sorts, nil
 }
 
+func (d *Decoder[T]) decodeField(query Query) (*FieldSet, error) {
+	field, op, values := query.Field, query.Op, query.Values
+
+	tag, ok := d.tags[field]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrUnknownField, field)
+	}
+
+	hasOp := tag.Ops.Has(op)
+	if !hasOp {
+		return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, query)
+	}
+
+	parser, ok := d.parsers[tag.Type.Name]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrUnknownParser, tag.Type.Name)
+	}
+
+	fs := FieldSet{
+		Tag:    tag,
+		Name:   field,
+		Op:     op,
+		Values: values,
+	}
+
+	switch {
+	case OpsMany.Has(op), tag.Type.Array:
+		res, err := Map(values, parser)
+		if err != nil {
+			return nil, err
+		}
+
+		fs.Value = res
+	default:
+		if len(values) > 1 {
+			return nil, fmt.Errorf("%w: %s", ErrTooManyValues, query)
+		}
+
+		value, _ := Unquote(values[0], '"', '"')
+		res, err := parser(value)
+		if err != nil {
+			return nil, err
+		}
+
+		fs.Value = res
+	}
+
+	return &fs, nil
+}
+
 func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 	ands := make([]FieldSet, 0, len(values))
 
@@ -328,53 +379,12 @@ func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 	}
 
 	for _, query := range queries {
-		field, op, values := query.Field, query.Op, query.Values
-
-		tag, ok := d.tags[field]
-		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrUnknownField, field)
+		fs, err := d.decodeField(query)
+		if err != nil {
+			return nil, err
 		}
 
-		hasOp := tag.Ops.Has(op)
-		if !hasOp {
-			return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, query)
-		}
-
-		parser, ok := d.parsers[tag.Type.Name]
-		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrUnknownParser, tag.Type.Name)
-		}
-
-		fs := FieldSet{
-			Tag:    tag,
-			Name:   field,
-			Op:     op,
-			Values: values,
-		}
-
-		switch {
-		case OpsMany.Has(op), tag.Type.Array:
-			res, err := Map(values, parser)
-			if err != nil {
-				return nil, err
-			}
-
-			fs.Value = res
-		default:
-			if len(values) > 1 {
-				return nil, fmt.Errorf("%w: %s", ErrTooManyValues, query)
-			}
-
-			value, _ := Unquote(values[0], '"', '"')
-			res, err := parser(value)
-			if err != nil {
-				return nil, err
-			}
-
-			fs.Value = res
-		}
-
-		ands = append(ands, fs)
+		ands = append(ands, *fs)
 	}
 
 	return ands, nil
@@ -388,33 +398,42 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 	}
 
 	conjs := make([]FieldSet, 0, len(values))
-	for _, v := range values {
-		value, ok := Unquote(v, '(', ')')
-		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrInvalidOp, conj)
-		}
 
-		values := SplitOutsideBrackets(value)
+	for _, value := range values {
 
 		var andvals, orvals []string
-		uvals := make(url.Values)
-		for _, value := range values {
-			field, opv := Split2(value, ".")
+		field, opv := Split2(value, ".")
 
-			switch field {
-			case OpOr.String():
-				orvals = append(orvals, opv)
-			case OpAnd.String():
-				andvals = append(andvals, opv)
-			default:
-				rawOp, value := Split2(opv, ":")
-				op, ok := ParseOp(rawOp)
-				if !ok {
-					return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, rawOp)
-				}
-
-				uvals.Add(fmt.Sprintf("%s.%s", field, op), value)
+		switch field {
+		case OpOr.String():
+			vl, ok := Unquote(opv, '(', ')')
+			if !ok {
+				return nil, fmt.Errorf("%w: %s", ErrInvalidConjunction, opv)
 			}
+			vals := SplitCsv(vl)
+
+			orvals = append(orvals, vals...)
+		case OpAnd.String():
+			vl, ok := Unquote(opv, '(', ')')
+			if !ok {
+				return nil, fmt.Errorf("%w: %s", ErrInvalidConjunction, opv)
+			}
+			vals := SplitCsv(vl)
+
+			andvals = append(andvals, vals...)
+		default:
+			rawOp, rawValue := Split2(opv, ":")
+			op, ok := ParseOp(rawOp)
+			if !ok {
+				return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, rawOp)
+			}
+
+			fs, err := d.decodeField(Query{Field: field, Op: op, Values: []string{rawValue}})
+			if err != nil {
+				return nil, err
+			}
+
+			conjs = append(conjs, *fs)
 		}
 
 		ors, err := d.decodeConjunction(OpOr, orvals)
@@ -427,23 +446,18 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 			return nil, err
 		}
 
-		innerConj, err := d.decodeFields(uvals)
-		if err != nil {
-			return nil, err
+		if len(ors)+len(ands) != 0 {
+			fs := FieldSet{
+				Name:   conj.String(),
+				Op:     conj,
+				Value:  value,
+				Values: values,
+				And:    ands,
+				Or:     ors,
+			}
+
+			conjs = append(conjs, fs)
 		}
-
-		fs := FieldSet{
-			Name:   conj.String(),
-			Op:     conj,
-			Value:  value,
-			Values: values,
-			And:    ands,
-			Or:     ors,
-		}
-
-		fs.And = append(innerConj, fs.And...)
-
-		conjs = append(conjs, fs)
 	}
 
 	return conjs, nil
