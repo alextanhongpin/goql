@@ -47,7 +47,7 @@ type FieldSet struct {
 	Name   string
 	Value  any
 	Values []string
-	Op     string
+	Op     Op
 
 	Or  []FieldSet
 	And []FieldSet
@@ -348,7 +348,7 @@ func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 		fs := FieldSet{
 			Tag:    tag,
 			Name:   field,
-			Op:     op.String(),
+			Op:     op,
 			Values: values,
 		}
 
@@ -434,7 +434,7 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 
 		fs := FieldSet{
 			Name:   conj.String(),
-			Op:     conj.String(),
+			Op:     conj,
 			Value:  value,
 			Values: values,
 			And:    ands,

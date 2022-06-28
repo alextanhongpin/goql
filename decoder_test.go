@@ -409,7 +409,7 @@ func TestDecodeAnd(t *testing.T) {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 		}
 
-		if exp, got := goql.OpGt.String(), ageGt13.Op; exp != got {
+		if exp, got := goql.OpGt, ageGt13.Op; exp != got {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 		}
 
@@ -426,7 +426,7 @@ func TestDecodeAnd(t *testing.T) {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 		}
 
-		if exp, got := goql.OpLt.String(), ageLt30.Op; exp != got {
+		if exp, got := goql.OpLt, ageLt30.Op; exp != got {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 		}
 
@@ -450,7 +450,7 @@ func TestDecodeAnd(t *testing.T) {
 				t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 			}
 
-			if exp, got := goql.OpIlike.String(), nameIlike.Op; exp != got {
+			if exp, got := goql.OpIlike, nameIlike.Op; exp != got {
 				t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 			}
 
@@ -466,7 +466,7 @@ func TestDecodeAnd(t *testing.T) {
 				t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 			}
 
-			if exp, got := goql.OpNotIlike.String(), nameNotIlike.Op; exp != got {
+			if exp, got := goql.OpNotIlike, nameNotIlike.Op; exp != got {
 				t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 			}
 
@@ -508,7 +508,7 @@ func TestDecodeOr(t *testing.T) {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 		}
 
-		if exp, got := goql.OpIsNot.String(), heightIsNotNull.Op; exp != got {
+		if exp, got := goql.OpIsNot, heightIsNotNull.Op; exp != got {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 		}
 
@@ -524,7 +524,7 @@ func TestDecodeOr(t *testing.T) {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 		}
 
-		if exp, got := goql.OpGte.String(), heightGte170.Op; exp != got {
+		if exp, got := goql.OpGte, heightGte170.Op; exp != got {
 			t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
 		}
 
