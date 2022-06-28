@@ -399,8 +399,7 @@ func TestDecodeAnd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	debug(f.And, "AND", 0)
-	debug(f.Or, "OR", 0)
+	debug(f)
 
 	if exp, got := 3, len(f.And); exp != got {
 		t.Fatalf("expected %v, got %v: %v", exp, got, f.And)
@@ -498,8 +497,7 @@ func TestDecodeOr(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	debug(f.And, "AND", 0)
-	debug(f.Or, "OR", 0)
+	debug(f)
 
 	ors := f.Or[2].And
 	if exp, got := 2, len(ors); exp != got {
@@ -542,17 +540,35 @@ func TestDecodeOr(t *testing.T) {
 
 func TestDecodeNested(t *testing.T) {
 	type User struct {
-		Height *int
+		ID      int
+		Height  *int
+		Name    string
+		Married *bool
+		Age     *int
 	}
 
 	v := make(url.Values)
-	v.Add("and", "or.(height.gt:100,height.lt:100,and.(height.gt:100,or.(height.gt:10,height.in:10,height.in:20),height.lt:200))")
-	v.Add("and", "height.in:100")
-	v.Add("and", "height.in:200")
-	v.Add("and", "or.(height.in:50,height.in:100)")
-	v.Add("or", "and.(height.isnot:null,height.gte:170,and.(height.gt:100,height.lt:200,or.(height.gt:100,height.lt:200)))")
-	v.Add("or", "height.eq:0")
-	v.Add("or", "height.gt:200")
+
+	v.Set("name.eq", "john")
+	v.Set("married.is", "true")
+	v["and"] = []string{
+		"name.eq:john",
+		"name.in:alice",
+		"name.in:bob",
+		"or.(age.gt:10,and.(age.isnot:null,age.lt:300),age.lt:30)",
+	}
+	v["or"] = []string{
+		"age.isnot:null",
+		"and.(or.(id.eq:1,id.neq:2),id.in:1,or.(age.gt:456,and.(married.eq:false,married.isnot:null)),id.in:2)",
+	}
+
+	//v.Add("and", "or.(height.gt:100,height.lt:100,and.(height.gt:100,or.(height.gt:10,height.in:10,height.in:20),height.lt:200))")
+	//v.Add("and", "height.in:100")
+	//v.Add("and", "height.in:200")
+	//v.Add("and", "or.(height.in:50,height.in:100)")
+	//v.Add("or", "and.(height.isnot:null,height.gte:170,and.(height.gt:100,height.lt:200,or.(height.gt:100,height.lt:200)))")
+	//v.Add("or", "height.eq:0")
+	//v.Add("or", "height.gt:200")
 
 	dec := goql.NewDecoder[User]()
 	f, err := dec.Decode(v)
@@ -560,21 +576,42 @@ func TestDecodeNested(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	debug(f.And, "AND", 0)
-	debug(f.Or, "OR", 0)
-
+	debug(f)
 }
 
-var debug func(sets []goql.FieldSet, msg string, depth int)
+var debug func(filter *goql.Filter)
 
 func init() {
-	debug = func(sets []goql.FieldSet, msg string, depth int) {
-		for i, set := range sets {
-			tab := strings.Repeat("\t", depth)
-			fmt.Printf("%s[%s]:%d. %s %s %#v\n", tab, msg, i+1, set.Name, set.Op, set.Value)
+	debug = func(filter *goql.Filter) {
 
-			debug(set.And, "AND", depth+1)
-			debug(set.Or, "OR", depth+1)
+		var debug func(sets []goql.FieldSet, depth int)
+		debug = func(sets []goql.FieldSet, depth int) {
+			for i, set := range sets {
+				tab := strings.Repeat("\t", depth)
+				fmt.Printf("%s%d. %s %q %#v\n", tab, i+1, set.Name, set.Op, set.Value)
+
+				tab = strings.Repeat("\t", depth+1)
+				if len(set.And) > 0 {
+					fmt.Printf("%s[AND]\n", tab)
+					debug(set.And, depth+1)
+				}
+
+				if len(set.Or) > 0 {
+					fmt.Printf("%s[OR]\n", tab)
+					debug(set.Or, depth+1)
+				}
+			}
+		}
+
+		if len(filter.And) > 0 {
+			fmt.Println("[AND]")
+			debug(filter.And, 0)
+		}
+
+		if len(filter.Or) > 0 {
+			fmt.Println("[OR]")
+			debug(filter.Or, 0)
 		}
 	}
+
 }

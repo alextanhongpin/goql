@@ -434,24 +434,33 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 			uvals.Add(fmt.Sprintf("%s.%s", field, op), rawValue)
 		}
 
-		ors, err := d.decodeConjunction(OpOr, orvals)
-		if err != nil {
-			return nil, err
-		}
+		if len(orvals) > 0 {
+			ors, err := d.decodeConjunction(OpOr, orvals)
+			if err != nil {
+				return nil, err
+			}
 
-		ands, err := d.decodeConjunction(OpAnd, andvals)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(ors)+len(ands) != 0 {
 			fs := FieldSet{
 				Name:   conj.String(),
-				Op:     conj,
-				Value:  value,
-				Values: values,
-				And:    ands,
+				Op:     OpOr,
+				Values: orvals,
 				Or:     ors,
+			}
+
+			conjs = append(conjs, fs)
+		}
+
+		if len(andvals) > 0 {
+			ands, err := d.decodeConjunction(OpAnd, andvals)
+			if err != nil {
+				return nil, err
+			}
+
+			fs := FieldSet{
+				Name:   conj.String(),
+				Op:     OpAnd,
+				Values: andvals,
+				And:    ands,
 			}
 
 			conjs = append(conjs, fs)
