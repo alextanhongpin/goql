@@ -329,8 +329,7 @@ func (d *Decoder[T]) decodeField(query Query) (*FieldSet, error) {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownField, field)
 	}
 
-	hasOp := tag.Ops.Has(op)
-	if !hasOp {
+	if ok := tag.Ops.Has(op); !ok {
 		return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, query)
 	}
 
@@ -404,7 +403,6 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 
 	sort.Strings(values)
 	for _, value := range values {
-		var andvals, orvals []string
 		field, opv := Split2(value, ".")
 
 		switch field {
@@ -413,17 +411,44 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 			if !ok {
 				return nil, fmt.Errorf("%w: %s", ErrInvalidConjunction, opv)
 			}
-			vals := SplitOutsideBrackets(vl)
 
-			orvals = append(orvals, vals...)
+			vals := SplitOutsideBrackets(vl)
+			ors, err := d.decodeConjunction(OpOr, vals)
+			if err != nil {
+				return nil, err
+			}
+
+			fs := FieldSet{
+				Name:   conj.String(),
+				Op:     OpOr,
+				Values: vals,
+				Or:     ors,
+			}
+
+			conjs = append(conjs, fs)
+
 		case OpAnd.String():
 			vl, ok := Unquote(opv, '(', ')')
 			if !ok {
 				return nil, fmt.Errorf("%w: %s", ErrInvalidConjunction, opv)
 			}
+
 			vals := SplitOutsideBrackets(vl)
 
-			andvals = append(andvals, vals...)
+			ands, err := d.decodeConjunction(OpAnd, vals)
+			if err != nil {
+				return nil, err
+			}
+
+			fs := FieldSet{
+				Name:   conj.String(),
+				Op:     OpAnd,
+				Values: vals,
+				And:    ands,
+			}
+
+			conjs = append(conjs, fs)
+
 		default:
 			rawOp, rawValue := Split2(opv, ":")
 			op, ok := ParseOp(rawOp)
@@ -432,38 +457,6 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 			}
 
 			uvals.Add(fmt.Sprintf("%s.%s", field, op), rawValue)
-		}
-
-		if len(orvals) > 0 {
-			ors, err := d.decodeConjunction(OpOr, orvals)
-			if err != nil {
-				return nil, err
-			}
-
-			fs := FieldSet{
-				Name:   conj.String(),
-				Op:     OpOr,
-				Values: orvals,
-				Or:     ors,
-			}
-
-			conjs = append(conjs, fs)
-		}
-
-		if len(andvals) > 0 {
-			ands, err := d.decodeConjunction(OpAnd, andvals)
-			if err != nil {
-				return nil, err
-			}
-
-			fs := FieldSet{
-				Name:   conj.String(),
-				Op:     OpAnd,
-				Values: andvals,
-				And:    ands,
-			}
-
-			conjs = append(conjs, fs)
 		}
 	}
 

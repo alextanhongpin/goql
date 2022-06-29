@@ -14,55 +14,68 @@ type Query struct {
 	Values []string
 }
 
+func NewQuery(query string, values []string) *Query {
+	field, operator := Split2(query, ".")
+	op, _ := ParseOp(operator)
+
+	return &Query{
+		Field:  field,
+		Op:     op,
+		Values: values,
+	}
+}
+
 func (q Query) String() string {
 	return fmt.Sprintf("%s.%s:%v", q.Field, q.Op, q.Values)
 }
 
+func (q *Query) Validate() error {
+	if q.Field == "" {
+		return fmt.Errorf("%w: %s", ErrUnknownField, q)
+	}
+
+	if !q.Op.Valid() {
+		return fmt.Errorf("%w: %s", ErrUnknownOperator, q)
+	}
+
+	return nil
+}
+
 // ParseQuery parses the query with operators.
-func ParseQuery(v url.Values, excludes ...string) ([]Query, error) {
-	result := make([]Query, 0, len(v))
+func ParseQuery(values url.Values, excludes ...string) ([]Query, error) {
+	result := make([]Query, 0, len(values))
 
 	exclude := make(map[string]bool)
 	for _, val := range excludes {
 		exclude[val] = true
 	}
 
-	for key, values := range v {
-		// Skip zero values.
-		if len(values) == 0 {
+	for key, vals := range values {
+		if exclude[key] || len(vals) == 0 {
 			continue
 		}
 
-		if exclude[key] {
-			continue
+		query := NewQuery(key, vals)
+		if err := query.Validate(); err != nil {
+			return nil, err
 		}
 
-		field, operator := Split2(key, ".")
-		if field == "" {
-			return nil, fmt.Errorf("%w: %s", ErrUnknownField, key)
-		}
-
-		op, ok := ParseOp(operator)
-		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, key)
-		}
-
-		result = append(result, Query{
-			Field:  field,
-			Op:     op,
-			Values: values,
-		})
+		result = append(result, *query)
 	}
 
-	sort.Slice(result, func(i, j int) bool {
-		lhs, rhs := result[i], result[j]
+	SortQuery(result)
+
+	return result, nil
+}
+
+func SortQuery(queries []Query) {
+	sort.Slice(queries, func(i, j int) bool {
+		lhs, rhs := queries[i], queries[j]
 		byField := strings.Compare(lhs.Field, rhs.Field)
 		byOp := strings.Compare(lhs.Op.String(), rhs.Op.String())
 
 		return sortBy(+byField, +byOp)
 	})
-
-	return result, nil
 }
 
 func sortBy(dir ...int) bool {

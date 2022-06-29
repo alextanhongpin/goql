@@ -562,14 +562,6 @@ func TestDecodeNested(t *testing.T) {
 		"and.(or.(id.eq:1,id.neq:2),id.in:1,or.(age.gt:456,and.(married.eq:false,married.isnot:null)),id.in:2)",
 	}
 
-	//v.Add("and", "or.(height.gt:100,height.lt:100,and.(height.gt:100,or.(height.gt:10,height.in:10,height.in:20),height.lt:200))")
-	//v.Add("and", "height.in:100")
-	//v.Add("and", "height.in:200")
-	//v.Add("and", "or.(height.in:50,height.in:100)")
-	//v.Add("or", "and.(height.isnot:null,height.gte:170,and.(height.gt:100,height.lt:200,or.(height.gt:100,height.lt:200)))")
-	//v.Add("or", "height.eq:0")
-	//v.Add("or", "height.gt:200")
-
 	dec := goql.NewDecoder[User]()
 	f, err := dec.Decode(v)
 	if err != nil {

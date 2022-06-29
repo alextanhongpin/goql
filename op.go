@@ -40,7 +40,8 @@ func (op Op) String() string {
 	return opsText[op]
 }
 
-// Valid returns true if the ops is set.
+// Valid returns true if the ops is set. Ops can be compound bits, so checking
+// individual ones would not make sense.
 func (op Op) Valid() bool {
 	return op != 0
 }
