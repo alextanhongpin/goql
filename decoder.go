@@ -112,6 +112,7 @@ func (d *Decoder[T]) SetFilterTag(filterTag string) *Decoder[T] {
 
 	var t T
 	tags, err := ParseStruct(t, filterTag, d.sortTag)
+
 	if err != nil {
 		panic(err)
 	}
@@ -279,20 +280,32 @@ func (d *Decoder[T]) parseLimit(u url.Values) (limit, offset *int, err error) {
 	return
 }
 
+func (d *Decoder[T]) reservedKeys() []string {
+	return []string{QueryAnd, QueryOr, d.querySort, d.queryLimit, d.queryOffset}
+}
+
 func (d *Decoder[T]) parseFilter(values url.Values) (ands, ors []FieldSet, err error) {
-	base, err := d.decodeFields(values)
-	if err != nil {
-		return nil, nil, err
+	baseValues := FilterValues(values, d.reservedKeys()...)
+
+	// Base values are the same as AND values.
+	// `name.eq=john` and `and=name.eq:john` is equivalent.
+	// We merge them in order to remove duplicate values.
+	andValues := make([]string, 0, len(baseValues))
+
+	for key, values := range baseValues {
+		for _, val := range values {
+			andValues = append(andValues, fmt.Sprintf("%s:%s", key, val))
+		}
 	}
 
-	ands, err = d.decodeConjunction(OpAnd, values[OpAnd.String()])
+	andValues = append(andValues, values[QueryAnd]...)
+
+	ands, err = d.decodeConjunction(OpAnd, andValues)
 	if err != nil {
 		return
 	}
 
-	ands = append(base, ands...)
-
-	ors, err = d.decodeConjunction(OpOr, values[OpOr.String()])
+	ors, err = d.decodeConjunction(OpOr, values[QueryOr])
 	if err != nil {
 		return
 	}
@@ -371,9 +384,10 @@ func (d *Decoder[T]) decodeField(query Query) (*FieldSet, error) {
 }
 
 func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
-	ands := make([]FieldSet, 0, len(values))
+	res := make([]FieldSet, 0, len(values))
 
-	queries, err := ParseQuery(values, QueryAnd, QueryOr, d.querySort, d.queryLimit, d.queryOffset)
+	values = FilterValues(values, d.reservedKeys()...)
+	queries, err := ParseQuery(values)
 	if err != nil {
 		return nil, err
 	}
@@ -384,10 +398,10 @@ func (d *Decoder[T]) decodeFields(values url.Values) ([]FieldSet, error) {
 			return nil, err
 		}
 
-		ands = append(ands, *fs)
+		res = append(res, *fs)
 	}
 
-	return ands, nil
+	return res, nil
 }
 
 func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, error) {
@@ -397,11 +411,13 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 		panic("goql: invalid conj")
 	}
 
+	values = Unique(values)
+	sort.Strings(values)
+
 	conjs := make([]FieldSet, 0, len(values))
 
 	uvals := make(url.Values)
 
-	sort.Strings(values)
 	for _, value := range values {
 		field, opv := Split2(value, ".")
 
@@ -450,13 +466,12 @@ func (d *Decoder[T]) decodeConjunction(conj Op, values []string) ([]FieldSet, er
 			conjs = append(conjs, fs)
 
 		default:
-			rawOp, rawValue := Split2(opv, ":")
-			op, ok := ParseOp(rawOp)
-			if !ok {
-				return nil, fmt.Errorf("%w: %s", ErrUnknownOperator, rawOp)
-			}
-
-			uvals.Add(fmt.Sprintf("%s.%s", field, op), rawValue)
+			// The `AND` may contain `in` operators, e.g.
+			// and=name.in:alice&and=name.in:bob
+			// We need to combine them to `name.in=[]string{alice, bob}` before
+			// parsing.
+			k, v := Split2(value, ":")
+			uvals.Add(k, v)
 		}
 	}
 

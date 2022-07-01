@@ -42,16 +42,11 @@ func (q *Query) Validate() error {
 }
 
 // ParseQuery parses the query with operators.
-func ParseQuery(values url.Values, excludes ...string) ([]Query, error) {
+func ParseQuery(values url.Values) ([]Query, error) {
 	result := make([]Query, 0, len(values))
 
-	exclude := make(map[string]bool)
-	for _, val := range excludes {
-		exclude[val] = true
-	}
-
 	for key, vals := range values {
-		if exclude[key] || len(vals) == 0 {
+		if len(vals) == 0 {
 			continue
 		}
 
@@ -86,4 +81,42 @@ func sortBy(dir ...int) bool {
 	}
 
 	return dir[len(dir)-1] < 0
+}
+
+// FilterValues filters the keys from the url.Values.
+func FilterValues(values url.Values, excludes ...string) url.Values {
+	cache := make(map[string]bool)
+
+	for _, exc := range excludes {
+		cache[exc] = true
+	}
+
+	res := make(url.Values)
+
+	for k, v := range values {
+		if cache[k] {
+			continue
+		}
+
+		res[k] = v
+	}
+
+	return res
+}
+
+// Unique returns a unique items in the same order.
+func Unique[T comparable](values []T) []T {
+	res := make([]T, 0, len(values))
+
+	cache := make(map[T]bool)
+	for _, val := range values {
+		if cache[val] {
+			continue
+		}
+
+		cache[val] = true
+		res = append(res, val)
+	}
+
+	return res
 }

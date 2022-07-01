@@ -17,7 +17,8 @@ func TestQuery(t *testing.T) {
 	v.Set("and", "(age.is:true,or(age.eq:13,age.eq.17))")
 	v.Set("or", "(married.isnot:true)")
 
-	queries, err := goql.ParseQuery(v, goql.OpAnd.String(), goql.OpOr.String())
+	v = goql.FilterValues(v, goql.OpAnd.String(), goql.OpOr.String())
+	queries, err := goql.ParseQuery(v)
 	if err != nil {
 		t.Fatalf("failed to parse query: %s", err)
 	}
